@@ -21,16 +21,16 @@
 ///////////////////////////////////////////////////////////////////////////////////
 
 void clearscreen(void);
-void setbank(char bank);
+void setbank(int8_t bank);
 void init_ts9347(void);
-void set_ptr(unsigned char X,unsigned char Y,unsigned char D,unsigned char B);
-void fillmosaic(unsigned char x,unsigned char y,unsigned char xsize,unsigned char ysize,unsigned char page) __reentrant;
-void setcharset(char * databuffer,unsigned char xsize,unsigned char ysize) __reentrant;
-void setcharset1010(const char * databuffer) __reentrant;
+void set_ptr(uint8_t X,uint8_t Y,uint8_t D,uint8_t B);
+void fillmosaic(uint8_t x,uint8_t y,uint8_t xsize,uint8_t ysize,uint8_t page) __reentrant;
+void setcharset(int8_t * databuffer,uint8_t xsize,uint8_t ysize) __reentrant;
+void setcharset1010(const int8_t * databuffer) __reentrant;
 
-void clearcharset(unsigned char ligne) __reentrant;
-void write_to_modem(unsigned char datavalue,unsigned char address);
-void write_to_modem_dtmf(unsigned char datavalue,unsigned char address);
+void clearcharset(uint8_t ligne) __reentrant;
+void write_to_modem(uint8_t datavalue,uint8_t address);
+void write_to_modem_dtmf(uint8_t datavalue,uint8_t address);
 void init_modem(void);
 
 #define WAIT_TS9347 while(TS9347_R0&0x80);

@@ -20,14 +20,15 @@
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
 
+#include <stdint.h>
 #include "deuxd_func.h"
 #include "troisd_func.h"
 #include "cossintab.h"
 
 
-const short	Xoff = 64;
-const short	Yoff = 64;
-const short	Zoff = 128;
+const int16_t	Xoff = 64;
+const int16_t	Yoff = 64;
+const int16_t	Zoff = 128;
 
 //Proc ; 3D -> 2D
 
@@ -41,17 +42,17 @@ void Show3DPoint(dot * point,dot2d * point2D)
 }
 
 
-void rotateX(dot * point,unsigned char xang)
+void rotateX(dot * point,int8_t xang)
 {
 // Rotate around x-axis
 // YT = Y * COS(xang) - Z * SIN(xang) / 256
 // ZT = Y * SIN(xang) + Z * COS(xang) / 256
 // Y = YT
 // Z = ZT
-	short yt;
-	short zt;
-	char cosv;
-	char sinv;
+	int16_t yt;
+	int16_t zt;
+	int8_t cosv;
+	int8_t sinv;
 
 	cosv=SinCos[xang];
 	xang=xang+64;
@@ -72,17 +73,17 @@ void rotateX(dot * point,unsigned char xang)
 
 
 
-void rotateY(dot * point,unsigned char yang)
+void rotateY(dot * point,int8_t yang)
 {
 // Rotate around y-axis
 // XT = X * COS(yang) - Z * SIN(yang) / 256
 // ZT = X * SIN(yang) + Z * COS(yang) / 256
 // X = XT
 // Z = ZT
-	short xt;
-	short zt;
-	char cosv;
-	char sinv;
+	int16_t xt;
+	int16_t zt;
+	int8_t cosv;
+	int8_t sinv;
 
 	cosv=SinCos[yang];
 	yang=yang+64;
@@ -101,17 +102,17 @@ void rotateY(dot * point,unsigned char yang)
 
 }
 
-void rotateZ(dot * point,unsigned char zang)
+void rotateZ(dot * point,int8_t zang)
 {
 // Rotate around z-axis
 // XT = X * COS(zang) - Y * SIN(zang) / 256
 // YT = X * SIN(zang) + Y * COS(zang) / 256
 // X = XT
 // Y = YT
-	short xt;
-	short yt;
-	char cosv;
-	char sinv;
+	int16_t xt;
+	int16_t yt;
+	int8_t cosv;
+	int8_t sinv;
 
 	cosv=SinCos[zang];
 	zang=zang+64;
@@ -130,9 +131,10 @@ void rotateZ(dot * point,unsigned char zang)
 
 }
 
-void drawpolygone(char * polygone,short xrotate,short yrotate,short zrotate,char state)   /* __reentrant		  */
+void drawpolygone(int8_t * polygone,int16_t xrotate,int16_t yrotate,int16_t zrotate,int8_t state)  /* __reentrant		  */
 {
-	char i,c;
+	int8_t i,c;
+
 	dot temppoint[3];
 	dot2d points2d[3];
 
@@ -201,9 +203,9 @@ void drawpolygone(char * polygone,short xrotate,short yrotate,short zrotate,char
 	}
 }
 
-void drawobject(d3dtype * obj,short xrotate,short yrotate,short zrotate,char state)       __reentrant
+void drawobject(d3dtype * obj,int16_t xrotate,int16_t yrotate,int16_t zrotate,int8_t state)     __reentrant
 {
-	unsigned char i;
+	uint8_t i;
 	for(i=0;i<obj->nbfaces;i++)
 	{
 		drawpolygone(&obj->vertex[i<<4],xrotate,yrotate,zrotate,state);

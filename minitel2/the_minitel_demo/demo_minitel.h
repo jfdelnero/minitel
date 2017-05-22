@@ -20,8 +20,8 @@
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
 
-void set_ptr(unsigned char X,unsigned char Y,unsigned char D,unsigned char B);
-void write_to_modem(unsigned char datavalue,unsigned char address);
-void write_to_modem_dtmf(unsigned char datavalue,unsigned char address);
+void set_ptr(uint8_t X,uint8_t Y,uint8_t D,uint8_t B);
+void write_to_modem(uint8_t datavalue,uint8_t address);
+void write_to_modem_dtmf(uint8_t datavalue,uint8_t address);
 void init_modem(void);
 

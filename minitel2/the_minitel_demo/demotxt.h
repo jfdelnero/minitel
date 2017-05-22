@@ -20,6 +20,6 @@
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
 
-//const char txt_start[]="\n\nHxC2001 Presente ....\n                                 \n\n\n\n\n\n\n\n";
-const char txt_scroll[]="The Minitel Demo !  ";
-const char txt_start[]="\n\n\n\n<<Le Minitel est un terminal\ninformatique passif,\nc'est-à-dire qu'il s'agit\nuniquement d'un clavier et d'un écran,\nsans capacité de traitement\nni dispositif de stockage.>>\n\n Ah bon ? voyons cela...";
+//const int8_t txt_start[]="\n\nHxC2001 Presente ....\n                                 \n\n\n\n\n\n\n\n";
+const int8_t txt_scroll[]="The Minitel Demo !  ";
+const int8_t txt_start[]="\n\n\n\n<<Le Minitel est un terminal\ninformatique passif,\nc'est-à-dire qu'il s'agit\nuniquement d'un clavier et d'un écran,\nsans capacité de traitement\nni dispositif de stockage.>>\n\n Ah bon ? voyons cela...";

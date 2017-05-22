@@ -22,12 +22,12 @@
 
 typedef struct dot2d_
 {
-	char x;
-	char y;
+	int8_t x;
+	int8_t y;
 }dot2d;
 
-void setpixel(unsigned char x,unsigned char y, unsigned char state);
-void setpixelFast(unsigned char x,unsigned char y);
-void Ligne(dot2d * pointA,dot2d * pointB,char state)  __reentrant;
+void setpixel(uint8_t x,uint8_t y, uint8_t state);
+void setpixelFast(uint8_t x,uint8_t y);
+void Ligne(dot2d * pointA,dot2d * pointB,int8_t state)  __reentrant;
 void LigneFast(dot2d * pointA,dot2d * pointB)  __reentrant;
-void cercle(short rayon,short x_centre,short y_centre,unsigned char state)  __reentrant;
+void cercle(int16_t rayon,int16_t x_centre,int16_t y_centre,uint8_t state)  __reentrant;

@@ -20,6 +20,7 @@
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
 
+#include <stdint.h>
 #include <8052.h>
 #include <math.h>
 #include "demo_minitel.h"
@@ -48,16 +49,16 @@
 
 #include "nyan_cat.h"
 
-const unsigned char * spritestab[]={ data_nolife_bmp,  data_bmpImage3_raw,  data_bmpImage4_raw,data_bmpImage5_raw};
+const uint8_t * spritestab[]={ data_nolife_bmp,  data_bmpImage3_raw,  data_bmpImage4_raw,data_bmpImage5_raw};
 
-volatile unsigned char hwctrlstatus;
-volatile char musicptr;
-volatile char musicptr2;
+volatile uint8_t hwctrlstatus;
+volatile int8_t musicptr;
+volatile int8_t musicptr2;
 
-volatile unsigned short timer_tick;
-volatile unsigned char start_tick;
-volatile unsigned short tick_to_wait;
-volatile unsigned char buffernb;
+volatile uint16_t timer_tick;
+volatile uint8_t start_tick;
+volatile uint16_t tick_to_wait;
+volatile uint8_t buffernb;
 
 enum DEMOSTATE
 {
@@ -70,7 +71,7 @@ enum DEMOSTATE
 	 SCREENNYAN
 };
 
-const unsigned char initstarstab[25]=
+const uint8_t initstarstab[25]=
 {
 	37,4,26,11,33,20,26,35,
 	15,47,19,45,13,28,36,34,
@@ -86,9 +87,9 @@ const polyg testpg=
 	}
 };
 
-const unsigned char txt[]=" Minitel Demo Test ! (c)HxC2001 ";
+const uint8_t txt[]=" Minitel Demo Test ! (c)HxC2001 ";
 
-void wait(unsigned short ms)
+void wait(uint16_t ms)
 {
 	start_tick=0;
 	tick_to_wait=ms;
@@ -150,7 +151,7 @@ void timer_isr (void) __interrupt (TF0_VECTOR) //__using (1)
 void nyan_cat_sc()
 {
 	int x,y,xstart,ystart,i,j,k,l,m;
-	unsigned char c;
+	uint8_t c;
 
 	xstart=0;
 	ystart=8;//8+0;
@@ -345,9 +346,9 @@ void start_screen()
 
 void starfield() __reentrant
 {
-	unsigned char i,j,t;
-	unsigned char starttab[25];
-	unsigned short k;
+	uint8_t i,j,t;
+	uint8_t starttab[25];
+	uint16_t k;
 
 	buffernb=0;
 	clearcharset(0);
@@ -412,7 +413,7 @@ int mandel()   __reentrant
 {
 	// screen ( integer) coordinate
 	int iX,iY;
-	unsigned char i,j;
+	uint8_t i,j;
 	const int iXmax = 80;
 	const int iYmax = 100;
 	//world ( float) coordinate = parameter plane
@@ -504,8 +505,8 @@ int mandel()   __reentrant
 void main(void)
 {
 
-	unsigned char demostate;
-	unsigned short i,j,k,l;
+	uint8_t demostate;
+	uint16_t i,j,k,l;
 
 	init_ts9347();
 	init_modem();

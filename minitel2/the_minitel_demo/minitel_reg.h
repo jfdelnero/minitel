@@ -30,7 +30,7 @@
 
 #define HW_CTRL_CTRON 0x08
 #define HW_CTRL_COILON 0x20
-volatile __xdata __at 0x2000 unsigned char hw_ctrl_reg;
+volatile __xdata __at 0x2000 uint8_t hw_ctrl_reg;
 
 ///////////////////////////////////////////////////////////
 // Video chip regs
@@ -63,22 +63,22 @@ volatile __xdata __at 0x2000 unsigned char hw_ctrl_reg;
 #define ROR_REG 0x07
 #define READ_REG 0x08
 
-volatile __xdata __at 0x4020 unsigned char TS9347_R0;
-volatile __xdata __at 0x4021 unsigned char TS9347_R1;
-volatile __xdata __at 0x4022 unsigned char TS9347_R2;
-volatile __xdata __at 0x4023 unsigned char TS9347_R3;
-volatile __xdata __at 0x4024 unsigned char TS9347_R4;
-volatile __xdata __at 0x4025 unsigned char TS9347_R5;
-volatile __xdata __at 0x4026 unsigned char TS9347_R6;
-volatile __xdata __at 0x4027 unsigned char TS9347_R7;
-volatile __xdata __at 0x4028 unsigned char TS9347_ER0;
-volatile __xdata __at 0x4029 unsigned char TS9347_ER1;
-volatile __xdata __at 0x402A unsigned char TS9347_ER2;
-volatile __xdata __at 0x402B unsigned char TS9347_ER3;
-volatile __xdata __at 0x402C unsigned char TS9347_ER4;
-volatile __xdata __at 0x402D unsigned char TS9347_ER5;
-volatile __xdata __at 0x402E unsigned char TS9347_ER6;
-volatile __xdata __at 0x402F unsigned char TS9347_ER7;
+volatile __xdata __at 0x4020 uint8_t TS9347_R0;
+volatile __xdata __at 0x4021 uint8_t TS9347_R1;
+volatile __xdata __at 0x4022 uint8_t TS9347_R2;
+volatile __xdata __at 0x4023 uint8_t TS9347_R3;
+volatile __xdata __at 0x4024 uint8_t TS9347_R4;
+volatile __xdata __at 0x4025 uint8_t TS9347_R5;
+volatile __xdata __at 0x4026 uint8_t TS9347_R6;
+volatile __xdata __at 0x4027 uint8_t TS9347_R7;
+volatile __xdata __at 0x4028 uint8_t TS9347_ER0;
+volatile __xdata __at 0x4029 uint8_t TS9347_ER1;
+volatile __xdata __at 0x402A uint8_t TS9347_ER2;
+volatile __xdata __at 0x402B uint8_t TS9347_ER3;
+volatile __xdata __at 0x402C uint8_t TS9347_ER4;
+volatile __xdata __at 0x402D uint8_t TS9347_ER5;
+volatile __xdata __at 0x402E uint8_t TS9347_ER6;
+volatile __xdata __at 0x402F uint8_t TS9347_ER7;
 
 ///////////////////////////////////////////////////////////
 // Modem

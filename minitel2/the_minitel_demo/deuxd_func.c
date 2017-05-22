@@ -20,15 +20,16 @@
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
 
+#include <stdint.h>
 #include <8052.h>
 #include "deuxd_func.h"
 #include "minitel_reg.h"
 #include "minitel_hw.h"
 
-extern volatile unsigned char buffernb;
+extern volatile uint8_t buffernb;
 
 
-const unsigned char div10tab[]=
+const uint8_t div10tab[]=
 {
 	0,0,0,0,0,0,0,0,0,0,
 	1,1,1,1,1,1,1,1,1,1,
@@ -58,15 +59,15 @@ const unsigned char div10tab[]=
 	25,25,25,25,25,25,25,25,25,25
 };
 
-const unsigned char multentab[]=
+const uint8_t multentab[]=
 {
 	0,10,20,30,40,50,60,70,80,90,100,110,120
 };
 
 
-void setpixel(unsigned char x,unsigned char y, unsigned char state)
+void setpixel(uint8_t x,uint8_t y, uint8_t state)
 {
-	unsigned char i,j,c,k,d;
+	uint8_t i,j,c,k,d;
 
 	if(x<80 && y<100)
 	{
@@ -99,9 +100,9 @@ void setpixel(unsigned char x,unsigned char y, unsigned char state)
 }
 
 
-void setpixelFast(unsigned char x,unsigned char y)
+void setpixelFast(uint8_t x,uint8_t y)
 {
-	unsigned char i,c,k;
+	uint8_t i,c,k;
 
 	i=div10tab[y];//y/10;
 	k=y-multentab[i];
@@ -125,15 +126,15 @@ void setpixelFast(unsigned char x,unsigned char y)
 
 dot2d points2d[3];
 
-void Ligne(dot2d * pointA,dot2d * pointB,char state) __reentrant
+void Ligne(dot2d * pointA,dot2d * pointB,int8_t state) __reentrant
 {
-	char first_x,last_x;
-	char first_y,last_y;
-	char dx;
-	char dy;
-	char inc1,inc2;
-	char sub,remain,error;
-	char x1,x2,y1,y2;
+	int8_t first_x,last_x;
+	int8_t first_y,last_y;
+	int8_t dx;
+	int8_t dy;
+	int8_t inc1,inc2;
+	int8_t sub,remain,error;
+	int8_t x1,x2,y1,y2;
 
 	x1=  pointA->x;
 	x2=  pointB->x;
@@ -232,20 +233,20 @@ void Ligne(dot2d * pointA,dot2d * pointB,char state) __reentrant
 
 void LigneFast(dot2d * pointA,dot2d * pointB) __reentrant
 {
-	char first_x,last_x;
-	char first_y,last_y;
-	char dx;
-	char dy;
-	char inc1,inc2;
-	char sub,remain,error;
-	char x1,x2,y1,y2;
+	int8_t first_x,last_x;
+	int8_t first_y,last_y;
+	int8_t dx;
+	int8_t dy;
+	int8_t inc1,inc2;
+	int8_t sub,remain,error;
+	int8_t x1,x2,y1,y2;
 
 	x1=  pointA->x;
 	x2=  pointB->x;
 	y1=  pointA->y;
 	y2=  pointB->y;
 
-    if(x1<x2)
+	if(x1<x2)
 	{
 		first_x=x1;
 		last_x=x2;
@@ -378,9 +379,9 @@ void LigneFast(dot2d * pointA,dot2d * pointB) __reentrant
 
 }
 
-void cercle(short rayon,short x_centre,short y_centre,unsigned char state)   __reentrant
+void cercle(int16_t rayon,int16_t x_centre,int16_t y_centre,uint8_t state)   __reentrant
 {
-	short x,y,d;
+	int16_t x,y,d;
 
 	x=0;
 	y=rayon;

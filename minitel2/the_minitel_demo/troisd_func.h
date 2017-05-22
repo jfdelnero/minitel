@@ -22,35 +22,35 @@
 
 typedef struct dot_
 {
-	char x;
-	char y;
-	char z;
+	int8_t x;
+	int8_t y;
+	int8_t z;
 }dot;
 
 typedef struct polyg_
 {
 	dot point[3];
-	char vectricemask;
+	int8_t vectricemask;
 
 }polyg;
 
 typedef  struct _data3dtype
 {
-   unsigned char nbfaces;
-   unsigned char nbvertex;
-   char * vertex;
-  unsigned char * faces;
+   uint8_t nbfaces;
+   uint8_t nbvertex;
+   int8_t * vertex;
+   uint8_t * faces;
 }data3dtype;
 
 typedef  struct _d3dtype
 {
-   unsigned char nbfaces;
-   char * vertex;
+   uint8_t nbfaces;
+   int8_t * vertex;
 }d3dtype;
 
 void Show3DPoint(dot * point,dot2d * point2D);
-void rotateX(dot * point,unsigned char xang);
-void rotateY(dot * point,unsigned char yang);
-void rotateZ(dot * point,unsigned char zang);
-void drawpolygone(char * polygone,short xrotate,short yrotate,short zrotate,char state);
-void drawobject(d3dtype * obj,short xrotate,short yrotate,short zrotate,char state)     __reentrant;
+void rotateX(dot * point,int8_t xang);
+void rotateY(dot * point,int8_t yang);
+void rotateZ(dot * point,int8_t zang);
+void drawpolygone(int8_t * polygone,int16_t xrotate,int16_t yrotate,int16_t zrotate,int8_t state);
+void drawobject(d3dtype * obj,int16_t xrotate,int16_t yrotate,int16_t zrotate,int8_t state)     __reentrant;
