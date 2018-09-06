@@ -27,7 +27,7 @@ Ci-dessus la carte mère du Minitel 2. On peut y repérer les composants princip
 
 ![Minitel 2 CPU](https://raw.githubusercontent.com/jfdelnero/minitel/master/doc/img/minitel2_cpu.jpg)
 
-L'unité centrale du Minitel 2: Un microcontroleur *80C32*. Il s'agit en fait de la version ROMless du microcontroleur 80C51. Ce microcontroleur est cadencé par la partie vidéo à *14,31818 Mhz*. En terme de puissance de calcul sachant qu'il faut au minimum 12 cycles d'horloges pour une instruction, cela tourne autour de 1 MIPS.
+L'unité centrale du Minitel 2: Un microcontroleur **80C32**. Il s'agit en fait de la version ROMless du microcontroleur 80C51. Ce microcontroleur est cadencé par la partie vidéo à **14,31818 Mhz**. En terme de puissance de calcul sachant qu'il faut au minimum 12 cycles d'horloges pour une instruction, cela tourne autour de 1 MIPS.
 
 Ce microcontroleur contient 256 octets de RAM en interne.
 
@@ -41,19 +41,19 @@ L'EPROM contenant le logiciel du minitel. Ce chip est sur support pour une event
 
 ![Minitel 2 Video](https://raw.githubusercontent.com/jfdelnero/minitel/master/doc/img/minitel2_video.jpg)
 
-La partie vidéo du minitel, peut être la partie la plus intéréssante. Le *TS9347* est un composant vidéo capable d'afficher du texte Alpha-Numérique.
-Le composant en question gêre directement *8KB de DRAM* (théoriquement extensible jusqu'à 32Ko).
+La partie vidéo du minitel, peut être la partie la plus intéréssante. Le **TS9347** est un composant vidéo capable d'afficher du texte Alpha-Numérique.
+Le composant en question gêre directement **8KB de DRAM** (théoriquement extensible jusqu'à 32Ko).
 Il est possible de définir ses propres tables de caractères, d'ou le nom "Semi-Graphic Display Processor".
 
 Le microcontroleur n'a pas d'accès direct à cette mémoire mais peut envoyer des commandes de lectures/écriture via le processeur graphique.
 
-L'horloge issue de l'oscillateur du processeur graphique cadencé à *14,31818 Mhz* est également utilisée par le microcontroleur 80C32.
+L'horloge issue de l'oscillateur du processeur graphique cadencé à **14,31818 Mhz** est également utilisée par le microcontroleur 80C32.
 
 ### Le Modem
 
 ![Minitel 2 Modem](https://raw.githubusercontent.com/jfdelnero/minitel/master/doc/img/minitel2_modem.jpg)
 
-La partie modem, composée d'un *TS7514CP*, un modem V.23 (modulation / démodulation en FSK a 1200/75 baud ou 75/1200 baud) .
+La partie modem, composée d'un **TS7514CP**, un modem V.23 (modulation / démodulation en FSK a 1200/75 baud ou 75/1200 baud) .
 Ce dernier est également connecté a un haut parleur interne au minitel et est capable de générer les fréquences DTMF 697Hz, 770Hz,852Hz, 941Hz, 1209Hz, 1336Hz, 1477Hz, 1633Hz ainsi que les fréquences de modulation 390Hz, 450Hz, 1300Hz et 2100Hz.
 
 Il ne reste plus qu'a composer quelque chose avec ça ;).
@@ -78,23 +78,23 @@ Et voici la matrice du clavier :
 
 ### IO & Mem Mapping :
 
-*0x2000 : Registre de contrôle modem / CRT / Relais :*
+**0x2000 : Registre de contrôle modem / CRT / Relais :**
 
-#define HW_CTRL_MCBC 0x01
-#define HW_CTRL_MODDTMF 0x02
-#define HW_CTRL_CTRON 0x08
-#define HW_CTRL_COILON 0x20
+\#define HW\_CTRL\_MCBC 0x01
+\#define HW\_CTRL\_MODDTMF 0x02
+\#define HW\_CTRL\_CTRON 0x08
+\#define HW\_CTRL\_COILON 0x20
 
-*0x4000 :* Chip video TS9347.
+**0x4000 :** Chip video TS9347.
 
-*Connexion modem:*
+**Connexion modem:**
 
-#define RXD_MODEM P3_3 // Modem -> CPU
-#define RTS_MODEM P1_4 // CPU -> Modem
-#define TXD_MODEM P1_3 // CPU -> Modem
-#define PRD_MODEM P1_2 // CPU -> Modem
-#define DCD_MODEM P1_1 // Modem -> CPU
-#define ZCO_MODEM P3_2 // Modem -> CPU
+\#define RXD\_MODEM P3\_3 // Modem \-\> CPU
+\#define RTS\_MODEM P1\_4 // CPU \-\> Modem
+\#define TXD\_MODEM P1\_3 // CPU \-\> Modem
+\#define PRD\_MODEM P1\_2 // CPU \-\> Modem
+\#define DCD\_MODEM P1\_1 // Modem \-\> CPU
+\#define ZCO\_MODEM P3\_2 // Modem \-\> CPU
 
 ### Bon et après ? Que peut on faire avec cela ?
 
