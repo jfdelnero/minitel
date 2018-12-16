@@ -81,10 +81,10 @@ Et voici la matrice du clavier :
 **0x2000 : Registre de contrôle modem / CRT / Relais :**
 
 ```c
-\#define HW\_CTRL\_MCBC 0x01
-\#define HW\_CTRL\_MODDTMF 0x02
-\#define HW\_CTRL\_CTRON 0x08
-\#define HW\_CTRL\_COILON 0x20
+#define HW_CTRL_MCBC 0x01
+#define HW_CTRL_MODDTMF 0x02
+#define HW_CTRL_CTRON 0x08
+#define HW_CTRL_COILON 0x20
 ```
 
 **0x4000 :** Chip video TS9347.
@@ -92,12 +92,12 @@ Et voici la matrice du clavier :
 **Connexion modem:**
 
 ```c
-\#define RXD\_MODEM P3\_3 // Modem \-\> CPU
-\#define RTS\_MODEM P1\_4 // CPU \-\> Modem
-\#define TXD\_MODEM P1\_3 // CPU \-\> Modem
-\#define PRD\_MODEM P1\_2 // CPU \-\> Modem
-\#define DCD\_MODEM P1\_1 // Modem \-\> CPU
-\#define ZCO\_MODEM P3\_2 // Modem \-\> CPU
+#define RXD_MODEM P3_3 // Modem -> CPU
+#define RTS_MODEM P1_4 // CPU -> Modem
+#define TXD_MODEM P1_3 // CPU -> Modem
+#define PRD_MODEM P1_2 // CPU -> Modem
+#define DCD_MODEM P1_1 // Modem -> CPU
+#define ZCO_MODEM P3_2 // Modem -> CPU
 ```
 
 ### Bon et après ? Que peut on faire avec cela ?
