@@ -855,6 +855,10 @@ int main(int argc, char* argv[])
 
 			close_file(&fc);
 		}
+		else
+		{
+			printf("ERROR : Can't open %s !\n",filename);
+		}
 	}
 
 	if( (isOption(argc,argv,"help",0)<=0) &&
