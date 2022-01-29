@@ -1,4 +1,4 @@
-# Batch convert vdt file to wav.
+# Batch convert vdt files in a folder to wav.
 
 rm  OUT.WAV
 
@@ -7,4 +7,3 @@ do
    echo "$file"
    ../build/vdt2wav -vdt:"$file" -wave:OUT.WAV
 done
-
