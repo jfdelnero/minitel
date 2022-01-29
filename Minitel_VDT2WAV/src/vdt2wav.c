@@ -69,7 +69,11 @@ Available command line options :
 #define DEFAULT_NUMBER_OF_CHANNELS 1
 #define DEFAULT_SAMPLERATE 11025
 
+#if defined(M_PI)
 #define PI M_PI
+#else
+#define PI 3.1415926535897932384626433832795
+#endif
 
 int verbose;
 
@@ -78,9 +82,9 @@ int verbose;
 typedef struct file_cache_
 {
 	FILE * f;
-	unsigned int  current_offset;
-	unsigned int  cur_page_size;
-	unsigned int  file_size;
+	int  current_offset;
+	int  cur_page_size;
+	int  file_size;
 	unsigned char cache_buffer[FILE_CACHE_SIZE];
 	int dirty;
 }file_cache;
@@ -168,7 +172,7 @@ error:
 	return -1;
 }
 
-unsigned char get_byte(file_cache * fc,unsigned int offset, int * success)
+unsigned char get_byte(file_cache * fc,int offset, int * success)
 {
 	unsigned char byte;
 	int ret;
@@ -331,7 +335,7 @@ int get_wave_file_last_samples(char* filename, short * samples_buf, int size)
 			return -1;
 		}
 
-		fseek(f,-(size*sizeof(short)),SEEK_END);
+		fseek(f,-(size*(int)sizeof(short)),SEEK_END);
 
 		if(fread(samples_buf,size*sizeof(short),1,f) != 1)
 		{
@@ -356,7 +360,7 @@ int write_wave_file(char* filename,short * wavebuf,int size,int samplerate)
 
 	memset(&wavhdr,0,sizeof(wavhdr));
 
-	f = fopen(filename,"r+");
+	f = fopen(filename,"r+b");
 	if(f)
 	{
 		if(fread(&wavhdr,sizeof(wav_hdr),1,f) != 1)
@@ -765,16 +769,16 @@ int main(int argc, char* argv[])
 		wg.baud_rate = atoi(tmp);
 	}
 
-	wg.bit_time = ((float)wg.sample_rate / (float)wg.baud_rate);
+	wg.bit_time = (int)((float)wg.sample_rate / (float)wg.baud_rate);
 
-	wg.Amplitude = 32767 * (float)((float)80/100);
+	wg.Amplitude = (int)(32767 * (float)((float)80/100));
 	if(isOption(argc,argv,"volume",(char*)&tmp)>0)
 	{
 		vol = atoi(tmp);
 		if(vol > 100)
 			vol = 100;
 
-		wg.Amplitude = 32767 * (float)((float)vol/100);
+		wg.Amplitude = (int)(32767 * (float)((float)vol/100));
 	}
 
 	wg.initial_start_delay = wg.sample_rate * 4;
