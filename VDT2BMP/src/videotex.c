@@ -26,7 +26,7 @@
 */
 
 /*
-Video Test file (*.vdt) to bmp file converter
+Videotex file (*.vdt) to bmp file converter
 (C) 2022 Jean-François DEL NERO
 
 videotex decoder.
