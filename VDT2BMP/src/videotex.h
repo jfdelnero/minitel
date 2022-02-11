@@ -56,18 +56,29 @@ typedef struct videotex_ctx_
 	uint32_t decoder_step;
 	unsigned char decoder_buffer[8];
 
-
 	unsigned char last_char;
 
-	unsigned char foreground_color;
-	unsigned char background_color;
+	unsigned int  current_attributs;
 
 	unsigned int palette[8];
 
-	int font;
-
-
 }videotex_ctx;
+
+#define ATTRIBUTS_FOREGROUND_C0LOR_MASK   0x7
+#define ATTRIBUTS_FOREGROUND_C0LOR_SHIFT  0x0
+
+#define ATTRIBUTS_BACKGROUND_C0LOR_MASK   0x7
+#define ATTRIBUTS_BACKGROUND_C0LOR_SHIFT  0x4
+
+#define ATTRIBUTS_FONT_MASK        0x3
+#define ATTRIBUTS_FONT_SHIFT       0x8
+
+#define ATTRIBUTS_INVERT_SHIFT     0xA
+#define ATTRIBUTS_BLINK_SHIFT      0xB
+#define ATTRIBUTS_UNDERLINE_SHIFT  0xC
+#define ATTRIBUTS_MASK_SHIFT       0xD
+#define ATTRIBUTS_XZOOM_SHIFT      0xE
+#define ATTRIBUTS_YZOOM_SHIFT      0xF
 
 videotex_ctx * init_videotex();
 int load_charset(videotex_ctx * ctx, char * file);

@@ -45,6 +45,16 @@ videotex decoder.
 // 8x10 character size
 // 320*250 screen resolution
 
+unsigned int set_mask(unsigned int reg, int shift, unsigned int mask, unsigned int val)
+{
+	return ( ( reg & ~(mask << shift) ) | ((val & mask) << shift) );
+}
+
+unsigned int get_mask(unsigned int reg, int shift, unsigned int mask)
+{
+	return ( (reg >> shift) & mask);
+}
+
 videotex_ctx * init_videotex()
 {
 	int i;
@@ -66,8 +76,7 @@ videotex_ctx * init_videotex()
 		ctx->bmp_res_x = ctx->char_res_x * ctx->char_res_x_size;
 		ctx->bmp_res_y = ctx->char_res_y * ctx->char_res_y_size;
 
-		ctx->foreground_color = 0x7;
-		ctx->background_color = 0x0;
+		resetstate(ctx);
 
 		ctx->char_buffer = malloc(ctx->char_res_x * ctx->char_res_y);
 		if(!ctx->char_buffer)
@@ -156,17 +165,15 @@ int load_charset(videotex_ctx * ctx, char * file)
 	return ret;
 }
 
-void draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,unsigned int attributs)
+int draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,unsigned int attributs)
 {
-	int i,j;
+	int i,j,pix,invert;
 	int rom_base,rom_bit_offset;
-	int font;
-
-	font = (attributs >> 8)&7;
-
+	int xfactor,yfactor;
+	int xoff,yoff;
 	rom_base=0;
 
-	switch(font)
+	switch(get_mask(attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK))
 	{
 		case 0:
 			if(c >= '@')
@@ -197,42 +204,63 @@ void draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,unsigned int att
 
 	}
 
-	for(j=0;j<ctx->char_res_y_size;j++)
+	xfactor = get_mask(attributs, ATTRIBUTS_XZOOM_SHIFT, 1) + 1;
+	yfactor = get_mask(attributs, ATTRIBUTS_YZOOM_SHIFT, 1) + 1;
+	invert = get_mask(attributs, ATTRIBUTS_INVERT_SHIFT, 1);
+
+	if(yfactor == 2)
+		y = y - ctx->char_res_y_size;
+
+	for(j=0;j<ctx->char_res_y_size*yfactor;j++)
 	{
 		for(i=0;i<ctx->char_res_x_size;i++)
 		{
-			rom_bit_offset = rom_base + ((j*ctx->char_res_x_size) + i);
+			rom_bit_offset = rom_base + (((j/yfactor)*ctx->char_res_x_size) + i);
 			rom_bit_offset &= ((2048*8)-1);
+
+			xoff = ((x+(i*xfactor)+(xfactor-1)));
+
 			if( ctx->charset[ (rom_bit_offset >> 3) ] & (0x80 >> (rom_bit_offset&7)) )
+				pix = 1;
+			else
+				pix = 0;
+
+			if( pix ^ invert )
 			{
-				if( ((x+i)<ctx->bmp_res_x) && ((y+j)<ctx->bmp_res_y) )
+				if( (xoff < ctx->bmp_res_x) && (xoff >= 0) && ((y+j)<ctx->bmp_res_y) && ((y+j)>=0) )
 				{
-					ctx->bmp_buffer[((y+j)*ctx->bmp_res_x)+(x+i)] = ctx->palette[attributs&7];
+					ctx->bmp_buffer[((y+j)*ctx->bmp_res_x)+(x+(i*xfactor))] = ctx->palette[(attributs>>ATTRIBUTS_FOREGROUND_C0LOR_SHIFT) & ATTRIBUTS_FOREGROUND_C0LOR_MASK];
+					if(xfactor==2)
+						ctx->bmp_buffer[((y+j)*ctx->bmp_res_x)+(x + (i*xfactor) + 1)] = ctx->palette[(attributs>>ATTRIBUTS_FOREGROUND_C0LOR_SHIFT) & ATTRIBUTS_FOREGROUND_C0LOR_MASK];
 				}
 			}
 			else
 			{
-				if( ((x+i)<ctx->bmp_res_x) && ((y+j)<ctx->bmp_res_y) )
+				if( (xoff < ctx->bmp_res_x) && (xoff >= 0) && ((y+j)<ctx->bmp_res_y) && ((y+j)>=0) )
 				{
-					ctx->bmp_buffer[((y+j)*ctx->bmp_res_x)+(x+i)] = ctx->palette[(attributs>>4)&7];
+					ctx->bmp_buffer[((y+j)*ctx->bmp_res_x)+(x+(i*xfactor))] = ctx->palette[(attributs>>ATTRIBUTS_BACKGROUND_C0LOR_SHIFT) & ATTRIBUTS_BACKGROUND_C0LOR_MASK];
+					if(xfactor==2)
+						ctx->bmp_buffer[((y+j)*ctx->bmp_res_x)+(x + (i*xfactor) + 1)] = ctx->palette[(attributs>>ATTRIBUTS_BACKGROUND_C0LOR_SHIFT) & ATTRIBUTS_BACKGROUND_C0LOR_MASK];
 				}
 			}
 		}
 
 	}
 
-
+	return  (ctx->char_res_x_size * xfactor);
 }
 
 void render_videotex(videotex_ctx * ctx)
 {
 	int i,j;
+	int xpos;
 
 	for(j=0;j<ctx->char_res_y;j++)
 	{
+		xpos = 0;
 		for(i=0;i<ctx->char_res_x;i++)
 		{
-			draw_char(ctx,i*ctx->char_res_x_size,j*ctx->char_res_y_size,ctx->char_buffer[(j*ctx->char_res_x) + i],ctx->attribut_buffer[(j*ctx->char_res_x) + i]);
+			xpos += draw_char(ctx,xpos,j*ctx->char_res_y_size,ctx->char_buffer[(j*ctx->char_res_x) + i],ctx->attribut_buffer[(j*ctx->char_res_x) + i]);
 		}
 	}
 }
@@ -310,9 +338,8 @@ void print_char(videotex_ctx * ctx,unsigned char c)
 	{
 		//printf("%c",c);
 		ctx->char_buffer[charindex] = c;
-		ctx->attribut_buffer[charindex] = (ctx->foreground_color) | \
-										  (ctx->background_color<<4) |
-										  (((ctx->font&7)<<8));
+
+		ctx->attribut_buffer[charindex] = ctx->current_attributs;
 	}
 
 	push_cursor(ctx,1);
@@ -368,9 +395,12 @@ unsigned char convert_pos(unsigned char x,unsigned char y,int ret)
 
 void resetstate(videotex_ctx * ctx)
 {
-	ctx->foreground_color = 0x7;
-	ctx->background_color = 0x0;
-	ctx->font = 0;
+	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FOREGROUND_C0LOR_SHIFT, ATTRIBUTS_FOREGROUND_C0LOR_MASK, 7);
+	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_BACKGROUND_C0LOR_SHIFT, ATTRIBUTS_BACKGROUND_C0LOR_MASK, 0);
+	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x0);
+	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x0);
+	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x0);
+	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x0);
 }
 
 void push_char(videotex_ctx * ctx, unsigned char c)
@@ -425,11 +455,11 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 					break;
 					case 0x0E:
 						printf("G1\n");
-						ctx->font = 1;
+						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x1);
 					break;
 					case 0x0F:
 						printf("G0\n");
-						ctx->font = 0;
+						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x0);
 					break;
 					case 0x11:
 						printf("Cursor ON\n");
@@ -446,15 +476,15 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 						printf("Cursor OFF\n");
 					break;
 					case 0x18:
-						tmp = ctx->font;
-						ctx->font = 0;
+						tmp = ctx->current_attributs;
+						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x0);
 						printf("Clear end off line\n");
 						fill_line(ctx, ' ');
-						ctx->font = tmp;
+						ctx->current_attributs = tmp;
 					break;
 					case 0x19:
 						printf("G2\n");
-						ctx->font = 2;
+						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x2);
 					break;
 					case 0x1A:
 						printf("Error\n");
@@ -503,10 +533,12 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 			{
 				case 0x48:
 					printf("clignotement\n");
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_BLINK_SHIFT, 0x1, 0x1);
 				break;
 
 				case 0x49:
 					printf("fixe\n");
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_BLINK_SHIFT, 0x1, 0x0);
 				break;
 
 				case 0x4A:
@@ -519,38 +551,51 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 
 				case 0x4C:
 					printf("taille normale\n");
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x0);
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x0);
 				break;
 
 				case 0x4D:
 					printf("double hauteur\n");
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x0);
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x1);
 				break;
 
 				case 0x4E:
 					printf("double largeur\n");
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x1);
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x0);
 				break;
 
 				case 0x4F:
 					printf("double hauteur et double largeur\n");
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x1);
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x1);
 				break;
 
 				case 0x58:
 					printf("masquage\n");
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_MASK_SHIFT, 0x1, 0x1);
 				break;
 
 				case 0x59:
 					printf("fin de lignage\n");
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
 				break;
 
 				case 0x5A:
 					printf("début de lignage\n");
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x1);
 				break;
 
 				case 0x5C:
 					printf("fond normal\n");
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x0);
 				break;
 
 				case 0x5D:
 					printf("inversion de fond\n");
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x1);
 				break;
 
 				case 0x5E:
@@ -559,6 +604,7 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 
 				case 0x5F:
 					printf("démasquage\n");
+					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_MASK_SHIFT, 0x1, 0x0);
 				break;
 
 				case 0x61:
@@ -570,8 +616,7 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 					{
 						printf("Set char color (%x)\n",c);
 						ctx->decoder_state = 0x00;
-						ctx->foreground_color = c&7;
-
+						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FOREGROUND_C0LOR_SHIFT, ATTRIBUTS_FOREGROUND_C0LOR_MASK, c);
 					}
 					else
 					{
@@ -579,8 +624,7 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 						{
 							printf("Set background color (%x)\n",c);
 							ctx->decoder_state = 0x00;
-
-							ctx->background_color = c&7;
+							ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_BACKGROUND_C0LOR_SHIFT, ATTRIBUTS_BACKGROUND_C0LOR_MASK, c);
 						}
 						else
 						{
