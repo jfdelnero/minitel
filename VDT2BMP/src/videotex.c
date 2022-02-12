@@ -43,6 +43,7 @@ videotex decoder.
 // 40x25 characters
 // 8x10 character size
 // 320*250 screen resolution
+//#define DEBUG 1
 
 #ifdef DEBUG
 #define LOG(...) printf(__VA_ARGS__)
@@ -51,6 +52,85 @@ videotex decoder.
 #endif
 
 #define ERROR(...) printf(__VA_ARGS__)
+
+const unsigned char special_char[][4]=
+{
+	{ 0x02,    0, 0x41, 0x61 }, // à
+	{ 0x02,    1, 0x41, 0x65 }, // è
+	{ 0x02,    2, 0x41, 0x75 }, // ù
+	{ 0x02,    5, 0x42, 0x65 }, // é
+	{ 0x02,    7, 0x43, 0x61 }, // â
+	{ 0x02,    8, 0x43, 0x65 }, // ê
+	{ 0x01,   10, 0x6A, 0x00 }, // Œ
+	{ 0x02,   11, 0x43, 0x69 }, // î
+	{ 0x01,   12, 0x2C, 0x00 }, // ←
+	{ 0x01,   13, 0x23, 0x00 }, // £
+	{ 0x01,   14, 0x2E, 0x00 }, // →
+	{ 0x01,   15, 0x2F, 0x00 }, // ↓
+	{ 0x01,   16, 0x30, 0x00 }, // °
+	{ 0x01,   17, 0x31, 0x00 }, // ±
+	{ 0x02,   18, 0x43, 0x6F }, // ô
+	{ 0x02,   19, 0x43, 0x75 }, // û
+	{ 0x02,   22, 0x48, 0x65 }, // ë
+	{ 0x02,   23, 0x48, 0x69 }, // ï
+	{ 0x02,   25, 0x4B, 0x63 }, // ç
+	{ 0x01,   26, 0x7A, 0x00 }, // œ
+	{ 0x01,   28, 0x3C, 0x00 }, // ¼
+	{ 0x01,   29, 0x3D, 0x00 }, // ½
+	{ 0x01,   30, 0x3E, 0x00 }, // ¾
+	{ 0x01,   94, 0x2D, 0x00 }, // ↑
+
+	{ 0x02,   97, 0x42, 0x61 }, //  á
+	{ 0x02,   97, 0x48, 0x61 }, //  ä
+	{ 0x02,  105, 0x41, 0x69 }, //  ì
+	{ 0x02,  105, 0x42, 0x69 }, //  í
+	{ 0x02,  111, 0x41, 0x6F }, //  ò
+	{ 0x02,  111, 0x42, 0x6F }, //  ó
+	{ 0x02,  111, 0x48, 0x6F }, //  ö
+	{ 0x02,  117, 0x42, 0x75 }, //  ú
+	{ 0x02,  117, 0x48, 0x75 }, //  ü
+
+	{ 0x01,   31, 0x7B, 0x00 }, //  ß
+	{ 0x01,   31, 0x7B, 0x00 }, //  β
+
+	{ 0x00, 0x00, 0x00, 0x00 }
+};
+
+int find_special_char(videotex_ctx * ctx,unsigned char * code, int size,unsigned char * charcode)
+{
+	int i,j;
+	unsigned char * ptr;
+
+	i = 0;
+	while(special_char[i][0])
+	{
+		ptr = (unsigned char *)&special_char[i];
+
+		if( ptr[0] == size)
+		{
+			j = 0;
+			while(j < size && j < 2)
+			{
+				if( ptr[2 + j] != code[j] )
+				{
+					break;
+				}
+
+				j++;
+			}
+
+			if(j==size)
+			{
+				*charcode = ptr[1];
+				return 1;
+			}
+		}
+
+		i++;
+	}
+
+	return 0;
+}
 
 unsigned int set_mask(unsigned int reg, int shift, unsigned int mask, unsigned int val)
 {
@@ -219,8 +299,7 @@ int draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,unsigned int attr
 //           rom_base = ((ctx->char_res_x_size * /*ctx->char_res_y_size*/ 32) * c) + 80*2;
 		break;
 		case 2:
-  //         rom_base = ((ctx->char_res_x_size * /*ctx->char_res_y_size*/ 32) * c) + 80*3;
-
+			rom_base = ((ctx->char_res_x_size * /*ctx->char_res_y_size*/ 32) * c) + 80*1;
 		break;
 
 
@@ -391,9 +470,10 @@ void clear_page(videotex_ctx * ctx)
 	set_cursor(ctx,3,0,0);
 }
 
-unsigned char convert_pos(unsigned char x,unsigned char y,int ret)
+unsigned char convert_pos(videotex_ctx * ctx,unsigned char x,unsigned char y,int ret)
 {
 	unsigned char x_pos,y_pos;
+	int charindex,i,cnt_dbl;
 
 	if( ( y >= 0x30 ) && (y <= 0x32) )
 	{
@@ -408,15 +488,32 @@ unsigned char convert_pos(unsigned char x,unsigned char y,int ret)
 		y_pos = y - 0x40;
 	}
 
+	cnt_dbl = 0;
+	if(y_pos < ctx->char_res_y)
+	{
+		charindex = (y_pos*ctx->char_res_x);
+
+		i = 0;
+		while(i<x_pos && i <ctx->char_res_x)
+		{
+			if( get_mask(ctx->attribut_buffer[charindex+i], ATTRIBUTS_XZOOM_SHIFT, 1))
+			{
+				cnt_dbl++;
+			}
+			i++;
+		}
+	}
+
 	if(ret)
 		return y_pos;
 	else
-		return x_pos;
+		return x_pos - cnt_dbl;
 }
 
 void push_char(videotex_ctx * ctx, unsigned char c)
 {
 	unsigned int i,tmp;
+	unsigned char tmp_char;
 
 	switch(ctx->decoder_state)
 	{
@@ -433,6 +530,9 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 
 				switch(c)
 				{
+					case 0x00:
+						LOG("Null char...\n");
+					break;
 					case 0x05:
 						LOG("demande d'identification\n");
 					break;
@@ -486,6 +586,10 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 					case 0x14:
 						LOG("Cursor OFF\n");
 					break;
+					case 0x16:
+						LOG("Tmp G2\n");
+						ctx->decoder_state = 0x16;
+					break;
 					case 0x18:
 						tmp = ctx->current_attributs;
 						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x0);
@@ -535,6 +639,28 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 		case 0x13:
 			LOG("Special command 0x%.2X\n",c);
 			ctx->decoder_state = 0x00;
+		break;
+
+		case 0x16:
+			// Special char
+			ctx->decoder_step++;
+			ctx->decoder_buffer[ctx->decoder_step] = c;
+
+			if(find_special_char(ctx,(unsigned char*)&ctx->decoder_buffer[1], ctx->decoder_step,&tmp_char))
+			{
+				tmp = ctx->current_attributs;
+				ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x2);
+				print_char(ctx,tmp_char);
+				ctx->current_attributs = tmp;
+
+				ctx->decoder_state = 0x00;
+			}
+
+			if(ctx->decoder_step >= 2)
+			{
+				ctx->decoder_state = 0x00;
+			}
+
 		break;
 
 		case 0x1B:
@@ -651,7 +777,7 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 			ctx->decoder_buffer[ctx->decoder_step] = c;
 			if(ctx->decoder_step >= 2)
 			{
-				set_cursor(ctx,0x3,convert_pos(ctx->decoder_buffer[2],ctx->decoder_buffer[1],0),convert_pos(ctx->decoder_buffer[2],ctx->decoder_buffer[1],1));
+				set_cursor(ctx,0x3,convert_pos(ctx,ctx->decoder_buffer[2],ctx->decoder_buffer[1],0),convert_pos(ctx,ctx->decoder_buffer[2],ctx->decoder_buffer[1],1));
 
 				ctx->decoder_state = 0x00;
 				resetstate(ctx);
