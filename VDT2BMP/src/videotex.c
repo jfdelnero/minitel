@@ -267,13 +267,26 @@ int load_charset(videotex_ctx * ctx, char * file)
 	return ret;
 }
 
+static unsigned char char_mask[][10]=
+{
+	{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}, // Normal
+	{0x88,0x88,0xFF,0x88,0x88,0x88,0xFF,0x88,0x88,0xFF}, // Mosaic separation
+	{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xFF}  // Underline
+};
+
+
 int draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,unsigned int attributs)
 {
-	int i,j,pix,invert;
-	int rom_base,rom_bit_offset;
+	int i,j,pix,pix_mask,pix_underline,invert;
+	int rom_base,rom_bit_offset,mask_bit_offset;
 	int xfactor,yfactor;
 	int xoff;
 	rom_base=0;
+	unsigned char * mask;
+	unsigned char * under_line_mask;
+
+	mask = (unsigned char*)&char_mask[0];
+	under_line_mask = (unsigned char*)&char_mask[0];
 
 	switch(get_mask(attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK))
 	{
@@ -282,6 +295,10 @@ int draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,unsigned int attr
 				rom_base = ((ctx->char_res_x_size * /*ctx->char_res_y_size*/ 32) * c) + 80*0;
 			else
 				rom_base = ((ctx->char_res_x_size * /*ctx->char_res_y_size*/ 32) * c) + 80*1;
+
+			//if(get_mask(attributs, ATTRIBUTS_UNDERLINE_SHIFT, 1))
+			//	under_line_mask = (unsigned char*)&char_mask[2];
+
 		break;
 		case 1:
 			if(c >= 0x1F && c <= 0x5F)
@@ -293,6 +310,9 @@ int draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,unsigned int attr
 				rom_base = ((ctx->char_res_x_size * /*ctx->char_res_y_size*/ 32) * c) + 80*2;
 			else
 				rom_base = ((ctx->char_res_x_size * /*ctx->char_res_y_size*/ 32) * c) + 80*2;
+
+			if(get_mask(attributs, ATTRIBUTS_UNDERLINE_SHIFT, 1))
+				mask = (unsigned char*)&char_mask[1];
 
 			//rom_base = ((ctx->char_res_x_size * /*ctx->char_res_y_size*/ 32) * c) + 80*2;
 
@@ -319,6 +339,8 @@ int draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,unsigned int attr
 			rom_bit_offset = rom_base + (((j/yfactor)*ctx->char_res_x_size) + i);
 			rom_bit_offset &= ((2048*8)-1);
 
+			mask_bit_offset = (((j/yfactor)*ctx->char_res_x_size) + i);
+
 			xoff = ((x+(i*xfactor)+(xfactor-1)));
 
 			if( ctx->charset[ (rom_bit_offset >> 3) ] & (0x80 >> (rom_bit_offset&7)) )
@@ -326,7 +348,17 @@ int draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,unsigned int attr
 			else
 				pix = 0;
 
-			if( pix ^ invert )
+			if( mask[ (mask_bit_offset >> 3) ] & (0x80 >> (mask_bit_offset&7)) )
+				pix_mask = 0;
+			else
+				pix_mask = 1;
+
+			if( under_line_mask[ (mask_bit_offset >> 3) ] & (0x80 >> (mask_bit_offset&7)) )
+				pix_underline = 1;
+			else
+				pix_underline = 0;
+
+			if( (((pix | pix_underline) ^ invert) && pix_mask) )
 			{
 				if( (xoff < ctx->bmp_res_x) && (xoff >= 0) && ((y+j)<ctx->bmp_res_y) && ((y+j)>=0) )
 				{
