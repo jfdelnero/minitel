@@ -274,6 +274,11 @@ int main(int argc, char* argv[])
 		vdt_ctx = init_videotex();
 		if(vdt_ctx)
 		{
+			if(isOption(argc,argv,"greyscale",NULL)>0)
+			{
+				select_palette(vdt_ctx,0);
+			}
+
 			load_charset(vdt_ctx, "font.bin");
 
 			printf("Write bmp file : %s from %s\n",ofilename,filename);

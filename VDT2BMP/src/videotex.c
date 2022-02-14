@@ -155,9 +155,40 @@ void resetstate(videotex_ctx * ctx)
 	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_MASK_SHIFT, 0x1, 0x0);
 }
 
-videotex_ctx * init_videotex()
+void select_palette(videotex_ctx * ctx, int pal_id)
 {
 	int i;
+
+	switch(pal_id)
+	{
+		case 0: // Black and white
+			i = 0;
+			ctx->palette[i++] = 0x000000; // 0%
+			ctx->palette[i++] = 0x7F7F7F; // 50%
+			ctx->palette[i++] = 0xB2B2B2; // 70%
+			ctx->palette[i++] = 0xE5E5E5; // 90%
+			ctx->palette[i++] = 0x666666; // 40%
+			ctx->palette[i++] = 0x999999; // 60%
+			ctx->palette[i++] = 0xCCCCCC; // 80%
+			ctx->palette[i++] = 0xFFFFFF; // 100%
+		break;
+		case 1: // Color
+			for(i=0;i<8;i++)
+			{
+				ctx->palette[i] = 0x000000;
+				if(i&1)
+					ctx->palette[i] |= 0x000000FF;
+				if(i&2)
+					ctx->palette[i] |= 0x0000FF00;
+				if(i&4)
+					ctx->palette[i] |= 0x00FF0000;
+			}
+		break;
+	}
+}
+
+videotex_ctx * init_videotex()
+{
 	videotex_ctx * ctx;
 
 	ctx = NULL;
@@ -196,16 +227,7 @@ videotex_ctx * init_videotex()
 
 		memset(ctx->bmp_buffer,0x29,ctx->bmp_res_x * ctx->bmp_res_y * sizeof(uint32_t) );
 
-		for(i=0;i<8;i++)
-		{
-			ctx->palette[i] = 0x000000;
-			if(i&1)
-				ctx->palette[i] |= 0x000000FF;
-			if(i&2)
-				ctx->palette[i] |= 0x0000FF00;
-			if(i&4)
-				ctx->palette[i] |= 0x00FF0000;
-		}
+		select_palette(ctx, 1);
 
 		ctx->last_char = ' ';
 	}

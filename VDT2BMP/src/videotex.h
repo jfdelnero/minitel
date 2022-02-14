@@ -83,6 +83,7 @@ typedef struct videotex_ctx_
 videotex_ctx * init_videotex();
 int load_charset(videotex_ctx * ctx, char * file);
 void render_videotex(videotex_ctx * ctx);
+void select_palette(videotex_ctx * ctx, int palid);
 void push_char(videotex_ctx * ctx, unsigned char c);
 
 void deinit_videotex(videotex_ctx * ctx);
