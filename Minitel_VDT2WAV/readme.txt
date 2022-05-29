@@ -1,4 +1,4 @@
-Video Test file (*.vdt) to wav file converter
+VidéoTex file (*.vdt) to wav file converter
 (C) 2022 Jean-François DEL NERO
 
 Usage Example : vdt2wav -vdt:a_vdt_file.vdt -wave:OUT.WAV

@@ -1,4 +1,4 @@
-/*
+g/*
 //
 // Copyright (C) 2022 Jean-François DEL NERO
 //
@@ -26,7 +26,7 @@
 */
 
 /*
-Video Test file (*.vdt) to wav file converter
+VidéoTex file (*.vdt) to wav file converter
 (C) 2022 Jean-François DEL NERO
 
 Usage example : vdt2wav -vdt:a_vdt_file.vdt -wave:OUT.WAV
