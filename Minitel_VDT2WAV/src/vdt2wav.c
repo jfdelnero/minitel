@@ -1,4 +1,4 @@
-g/*
+/*
 //
 // Copyright (C) 2022 Jean-François DEL NERO
 //
