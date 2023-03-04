@@ -1,37 +1,36 @@
-/*
+///////////////////////////////////////////////////////////////////////////////////
+//-------------------------------------------------------------------------------//
+//-------------------------------------------------------------------------------//
+//-----------H----H--X----X-----CCCCC----22222----0000-----0000------11----------//
+//----------H----H----X-X-----C--------------2---0----0---0----0--1--1-----------//
+//---------HHHHHH-----X------C----------22222---0----0---0----0-----1------------//
+//--------H----H----X--X----C----------2-------0----0---0----0-----1-------------//
+//-------H----H---X-----X---CCCCC-----222222----0000-----0000----1111------------//
+//-------------------------------------------------------------------------------//
+//----------------------------------------------------- http://hxc2001.free.fr --//
+///////////////////////////////////////////////////////////////////////////////////
+// File : bmp_file.c
+// Contains: bmp image file loader / writer
 //
-// Copyright (C) 2006-2022 Jean-Fran�ois DEL NERO
+// This file is part of VDT2BMP.
 //
-// This file is part of the HxCFloppyEmulator library
+// Written by: Jean-François DEL NERO
 //
-// HxCFloppyEmulator may be used and distributed without restriction provided
-// that this copyright statement is not removed from the file and that any
-// derivative work contains the original copyright notice and the associated
-// disclaimer.
+// Copyright (C) 2006-2023 Jean-François DEL NERO
 //
-// HxCFloppyEmulator is free software; you can redistribute it
-// and/or modify  it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
+// You are free to do what you want with this code.
+// A credit is always appreciated if you use it into your product :)
 //
-// HxCFloppyEmulator is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-//   See the GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with HxCFloppyEmulator; if not, write to the Free Software
-// Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-//
-*/
+// Change History (most recent first):
+///////////////////////////////////////////////////////////////////////////////////
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include <stdint.h>
 
 #include "bmp_file.h"
-
 
 int bmp_load(char * file,bitmap_data * bdata)
 {
@@ -46,21 +45,28 @@ int bmp_load(char * file,bitmap_data * bdata)
 	BITMAPINFOHEADER bitmap_info_header;
 	RGBQUAD * palette;
 
+	palette = NULL;
+	linebuffer = NULL;
+
 	f = fopen(file,"rb");
 	if(f)
 	{
-		fread(&bitmap_header,sizeof(BITMAPFILEHEADER),1,f);
+		if( fread(&bitmap_header,sizeof(BITMAPFILEHEADER),1,f) != 1 )
+			goto error;
 
 		if( bitmap_header.bfType == 19778 )
 		{
-			fread(&bitmap_info_header,sizeof(BITMAPINFOHEADER),1,f);
+			if( fread(&bitmap_info_header,sizeof(BITMAPINFOHEADER),1,f) != 1 )
+				goto error;
 
 			xsize=bitmap_info_header.biWidth;
 			ysize=bitmap_info_header.biHeight;
 			bitperpixel=bitmap_info_header.biBitCount;
 
-			if(!bitmap_info_header.biCompression)
+			if(!bitmap_info_header.biCompression || (bitmap_info_header.biCompression == BI_BITFIELDS) )
 			{
+				// TODO : Read and use the BI_BITFIELDS RGB masks.
+
 				// read palette
 				switch(bitperpixel)
 				{
@@ -80,6 +86,7 @@ int bmp_load(char * file,bitmap_data * bdata)
 						palettesize = 0;
 					break;
 					default:
+						//printf("bmp_load : bitperpixel not supported : %d\n",bitperpixel);
 						palettesize = 0;
 						//non supported
 					break;
@@ -89,10 +96,14 @@ int bmp_load(char * file,bitmap_data * bdata)
 				if(palettesize)
 				{
 					palette=(RGBQUAD *) malloc(palettesize*sizeof(RGBQUAD));
+					if(!palette)
+						goto error;
+
 					memset(palette,0,palettesize*sizeof(RGBQUAD));
 
 					fseek(f,sizeof(BITMAPFILEHEADER)+ bitmap_info_header.biSize ,SEEK_SET);
-					fread(palette,palettesize*sizeof(RGBQUAD),1,f);
+					if( fread(palette,palettesize*sizeof(RGBQUAD),1,f) != 1 )
+						goto error;
 				}
 
 				bitmapdataoffset = sizeof(BITMAPFILEHEADER)+ bitmap_info_header.biSize + (palettesize*sizeof(RGBQUAD));
@@ -101,6 +112,9 @@ int bmp_load(char * file,bitmap_data * bdata)
 				bdata->xsize = xsize;
 				bdata->ysize = ysize;
 				bdata->data = (uint32_t *)malloc(xsize*ysize*sizeof(uint32_t));
+				if(!bdata->data)
+					goto error;
+
 				memset(bdata->data,0,xsize*ysize*sizeof(uint32_t));
 
 				switch(bitperpixel)
@@ -112,23 +126,27 @@ int bmp_load(char * file,bitmap_data * bdata)
 							bitmapdatalinesize = (xsize/8 + (xsize&7));
 
 						linebuffer = (unsigned char *)malloc(bitmapdatalinesize);
+						if(!linebuffer)
+							goto error;
 
 						for(i = 0; i < ysize; i++ )
 						{
-
 							fseek(f,bitmapdataoffset + (bitmapdatalinesize*i) ,SEEK_SET);
-							fread(linebuffer,bitmapdatalinesize,1,f);
+							if( fread(linebuffer,bitmapdatalinesize,1,f) != 1 )
+								goto error;
 
 							for(j=0;j<xsize;j++)
 							{
-								bdata->data[(xsize*((ysize-1)-i))+j]=palette[(linebuffer[(j/8)]>>(7-(j&7)))&0x1].rgbRed |
-																	 palette[(linebuffer[(j/8)]>>(7-(j&7)))&0x1].rgbGreen<<8 |
-																	 palette[(linebuffer[(j/8)]>>(7-(j&7)))&0x1].rgbBlue<<16;
+								bdata->data[(xsize*((ysize-1)-i))+j]=palette[(linebuffer[(j/8)]>>(1*((7-(j))&7)))&0x1].rgbRed |
+																	 palette[(linebuffer[(j/8)]>>(1*((7-(j))&7)))&0x1].rgbGreen<<8 |
+																	 palette[(linebuffer[(j/8)]>>(1*((7-(j))&7)))&0x1].rgbBlue<<16;
 							}
 						}
 
 						free(linebuffer);
+						linebuffer = NULL;
 						free(palette);
+						palette = NULL;
 					break;
 
 					case 4:
@@ -138,11 +156,14 @@ int bmp_load(char * file,bitmap_data * bdata)
 							bitmapdatalinesize = (xsize/2 + (xsize&1));
 
 						linebuffer=(unsigned char *) malloc(bitmapdatalinesize);
+						if(!linebuffer)
+							goto error;
 
 						for(i=0;i<ysize;i++)
 						{
 							fseek(f,bitmapdataoffset + (bitmapdatalinesize*i) ,SEEK_SET);
-							fread(linebuffer,bitmapdatalinesize,1,f);
+							if( fread(linebuffer,bitmapdatalinesize,1,f) != 1 )
+								goto error;
 
 							for(j=0;j<xsize;j++)
 							{
@@ -153,7 +174,9 @@ int bmp_load(char * file,bitmap_data * bdata)
 						}
 
 						free(linebuffer);
+						linebuffer = NULL;
 						free(palette);
+						palette = NULL;
 					break;
 
 					case 8:
@@ -163,23 +186,27 @@ int bmp_load(char * file,bitmap_data * bdata)
 							bitmapdatalinesize = xsize;
 
 						linebuffer = (unsigned char *)malloc(bitmapdatalinesize);
+						if(!linebuffer)
+							goto error;
 
 						for(i=0;i<ysize;i++)
 						{
 							fseek(f,bitmapdataoffset + (bitmapdatalinesize*i) ,SEEK_SET);
-							fread(linebuffer,bitmapdatalinesize,1,f);
+							if( fread(linebuffer,bitmapdatalinesize,1,f) != 1 )
+								goto error;
 
 							for(j=0;j<xsize;j++)
 							{
 								bdata->data[(xsize*((ysize-1)-i))+j]=palette[linebuffer[j]].rgbRed |
 														 palette[linebuffer[j]].rgbGreen<<8 |
 														 palette[linebuffer[j]].rgbBlue<<16;
-
 							}
 						}
 
 						free(linebuffer);
+						linebuffer = NULL;
 						free(palette);
+						palette = NULL;
 					break;
 
 					case 24:
@@ -189,11 +216,14 @@ int bmp_load(char * file,bitmap_data * bdata)
 							bitmapdatalinesize=(xsize*3);
 
 						linebuffer=(unsigned char *)malloc(bitmapdatalinesize);
+						if(!linebuffer)
+							goto error;
 
 						for(i=0;i<ysize;i++)
 						{
 							fseek(f,bitmapdataoffset + (bitmapdatalinesize*i) ,SEEK_SET);
-							fread(linebuffer,bitmapdatalinesize,1,f);
+							if( fread(linebuffer,bitmapdatalinesize,1,f) != 1 )
+								goto error;
 
 							for(j=0;j<xsize;j++)
 							{
@@ -204,6 +234,7 @@ int bmp_load(char * file,bitmap_data * bdata)
 						}
 
 						free(linebuffer);
+						linebuffer = NULL;
 					break;
 
 					case 32:
@@ -213,24 +244,25 @@ int bmp_load(char * file,bitmap_data * bdata)
 							bitmapdatalinesize=(xsize*4);
 
 						linebuffer=(unsigned char *)malloc(bitmapdatalinesize);
+						if(!linebuffer)
+							goto error;
 
 						for(i=0;i<ysize;i++)
 						{
-
 							fseek(f,bitmapdataoffset + (bitmapdatalinesize*i) ,SEEK_SET);
-							fread(linebuffer,bitmapdatalinesize,1,f);
+							if( fread(linebuffer,bitmapdatalinesize,1,f) != 1 )
+								goto error;
 
 							for(j=0;j<xsize;j++)
 							{
 								bdata->data[(xsize*((ysize-1)-i))+j]=linebuffer[j*4+2] |
 																	 linebuffer[j*4+1]<<8 |
 																	 linebuffer[j*4+0]<<16;
-
 							}
 						}
 
 						free(linebuffer);
-
+						linebuffer = NULL;
 					break;
 
 					default:
@@ -241,6 +273,7 @@ int bmp_load(char * file,bitmap_data * bdata)
 			else
 			{
 				// non supported
+				//printf("bmp_load : Packed bmp not supported : %d\n",bitmap_info_header.biCompression);
 				fclose(f);
 				return -1;
 			}
@@ -257,6 +290,18 @@ int bmp_load(char * file,bitmap_data * bdata)
 	}
 
 	//file error
+	return -3;
+
+error:
+	if(f)
+		fclose(f);
+
+	if(palette)
+		free(palette);
+
+	if(linebuffer)
+		free(linebuffer);
+
 	return -3;
 }
 
@@ -459,12 +504,25 @@ int bmpRLE8b_write(char * file,bitmap_data * bdata)
 		fwrite(&bitmap_info_header,1,sizeof(BITMAPINFOHEADER),f);
 
 		memset(pal,0,sizeof(pal));
-		for(i=0;i<256;i++)
+		if(bdata->palette)
 		{
-			pal[(i*4) + 0] = (bdata->palette[(i*4) + 2]);
-			pal[(i*4) + 1] = (bdata->palette[(i*4) + 1]);
-			pal[(i*4) + 2] = (bdata->palette[(i*4) + 0]);
+			for(i=0;i<256;i++)
+			{
+				pal[(i*4) + 0] = (bdata->palette[(i*4) + 2]);
+				pal[(i*4) + 1] = (bdata->palette[(i*4) + 1]);
+				pal[(i*4) + 2] = (bdata->palette[(i*4) + 0]);
+			}
 		}
+		else
+		{
+			for(i=0;i<256;i++)
+			{
+				pal[(i*4) + 0] = i;
+				pal[(i*4) + 1] = i;
+				pal[(i*4) + 2] = i;
+			}
+		}
+
 		fwrite(pal,sizeof(pal),1,f);
 
 		linebuffer = (unsigned char *)malloc((bitmapdatalinesize*2) + (bdata->ysize*2));

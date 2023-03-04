@@ -1,5 +1,9 @@
 #pragma pack(1)
 
+#ifndef BI_BITFIELDS
+#define BI_BITFIELDS 3
+#endif
+
 typedef struct bitmap_data_
 {
 	int16_t xsize;
@@ -45,4 +49,4 @@ int bmpRLE8b_write(char * file,bitmap_data * bdata);
 int bmp24b_write(char * file,bitmap_data * bdata);
 int bmp16b_write(char * file,bitmap_data * bdata);
 
-unsigned char getPixelCode(uint32_t pix,uint32_t * pal,int * nbcol);
+
