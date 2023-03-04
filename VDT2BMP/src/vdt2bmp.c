@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2022 Jean-François DEL NERO
+// Copyright (C) 2022-2023 Jean-François DEL NERO
 //
 // This file is part of vdt2bmp.
 //
@@ -221,36 +221,131 @@ int isOption(int argc, char* argv[],char * paramtosearch,char * argtoparam)
 
 void printhelp(char* argv[])
 {
-	printf("Options:\n");
-	printf("  -vdt:file \t\t\t: vdt file\n");
-	printf("  -bmp:file \t\t\t: bmp file\n");
-	printf("  -help \t\t\t: This help\n");
-	printf("\n");
+	fprintf(stderr,"Options:\n");
+	fprintf(stderr,"  -vdt:file \t\t\t: vdt file\n");
+	fprintf(stderr,"  -bmp:file \t\t\t: bmp file\n");
+
+	fprintf(stderr,"  -stdout \t\t\t: stdout mode\n");
+	fprintf(stderr,"  Example : /vdt2bmp -ani -stdout in1.vdt in2.vdt | ffmpeg -y -f rawvideo -pix_fmt argb -s 320x250 -r 50 -i - -an out_vid.mkv\n");
+
+	fprintf(stderr,"  -help \t\t\t: This help\n");
+	fprintf(stderr,"\n");
+}
+
+int animate(videotex_ctx * vdt_ctx, char * vdtfile,int frameperiod_us, int nb_pause_frames, int stdout_mode)
+{
+	char ofilename[512];
+	int offset,i;
+	bitmap_data bmp;
+	int image_nb,pause_frames_cnt;
+	uint32_t ani_time_us;
+	uint32_t next_pic_timeout_us;
+	file_cache fc;
+	unsigned char * tmp_buf;
+	image_nb = 0;
+	next_pic_timeout_us = 0;
+	ani_time_us = 0;
+	pause_frames_cnt = 0;
+
+	fprintf(stderr,"Generate animation from %s...\n",vdtfile);
+
+	if(open_file(&fc, vdtfile,0xFF)>=0)
+	{
+		tmp_buf = malloc(vdt_ctx->bmp_res_x * vdt_ctx->bmp_res_y * 4);
+		memset(tmp_buf,0,vdt_ctx->bmp_res_x * vdt_ctx->bmp_res_y * 4);
+
+		offset = 0;
+		while(offset<fc.file_size || (pause_frames_cnt <= nb_pause_frames) )
+		{
+			if(offset<fc.file_size)
+			{
+				push_char(vdt_ctx, get_byte(&fc,offset, NULL) );
+			}
+
+			ani_time_us += 8333; // 8.333 ms (1 / (1200 Baud / 10))
+
+			if( ani_time_us >= next_pic_timeout_us )
+			{
+				if(!stdout_mode)
+				{
+					sprintf(ofilename,"I%.6d.bmp",image_nb);
+					fprintf(stderr,"Write bmp file : %s...\n",ofilename);
+				}
+
+				//write image...
+				render_videotex(vdt_ctx);
+				bmp.xsize = vdt_ctx->bmp_res_x;
+				bmp.ysize = vdt_ctx->bmp_res_y;
+				bmp.data = vdt_ctx->bmp_buffer;
+
+				if(!stdout_mode)
+					bmp24b_write(ofilename,&bmp);
+				else
+				{
+					for(i=0;i<(bmp.xsize * bmp.ysize);i++)
+					{
+						tmp_buf[(i*4)+1] = bmp.data[i] & 0xFF;
+						tmp_buf[(i*4)+2] = (bmp.data[i]>>8) & 0xFF;
+						tmp_buf[(i*4)+3] = (bmp.data[i]>>16) & 0xFF;
+					}
+					fwrite(tmp_buf, bmp.xsize * bmp.ysize * 4, 1, stdout);
+				}
+
+				image_nb++;
+
+				if(!(offset<fc.file_size))
+					pause_frames_cnt++;
+
+				next_pic_timeout_us += frameperiod_us;
+			}
+			offset++;
+		}
+
+		free(tmp_buf);
+		close_file(&fc);
+	}
+	else
+	{
+		fprintf(stderr,"ERROR : Can't open %s !\n",vdtfile);
+	}
+
+
+	return 0;
 }
 
 int main(int argc, char* argv[])
 {
 	char filename[512];
 	char ofilename[512];
-	int offset;
+
+	int offset,pal,stdoutmode;
+	int i;
 	videotex_ctx * vdt_ctx;
 	bitmap_data bmp;
 
 	file_cache fc;
 
 	verbose = 0;
+	stdoutmode = 0;
 
-	printf("Minitel VDT to BMP converter v1.0.0.0\n");
-	printf("Copyright (C) 2022 Jean-Francois DEL NERO\n");
-	printf("This program comes with ABSOLUTELY NO WARRANTY\n");
-	printf("This is free software, and you are welcome to redistribute it\n");
-	printf("under certain conditions;\n\n");
+	fprintf(stderr,"Minitel VDT to BMP converter v1.1.0.0\n");
+	fprintf(stderr,"Copyright (C) 2022-2023 Jean-Francois DEL NERO\n");
+	fprintf(stderr,"This program comes with ABSOLUTELY NO WARRANTY\n");
+	fprintf(stderr,"This is free software, and you are welcome to redistribute it\n");
+	fprintf(stderr,"under certain conditions;\n\n");
 
 	// Verbose option...
 	if(isOption(argc,argv,"verbose",0)>0)
 	{
-		printf("verbose mode\n");
+		fprintf(stderr,"verbose mode\n");
 		verbose=1;
+	}
+
+	// Verbose option...
+	if(isOption(argc,argv,"stdout",0)>0)
+	{
+		fprintf(stderr,"sdtout mode\n");
+		stdoutmode = 1;
 	}
 
 	// help option...
@@ -281,7 +376,7 @@ int main(int argc, char* argv[])
 
 			load_charset(vdt_ctx, "font.bin");
 
-			printf("Write bmp file : %s from %s\n",ofilename,filename);
+			fprintf(stderr,"Write bmp file : %s from %s\n",ofilename,filename);
 
 			if(open_file(&fc, filename,0xFF)>=0)
 			{
@@ -293,17 +388,7 @@ int main(int argc, char* argv[])
 				}
 
 				close_file(&fc);
-/*
-				c = 0;
-				for(j=0;j<vdt_ctx->char_res_y;j++)
-				{
-					for(i=0;i<vdt_ctx->char_res_x;i++)
-					{
-						draw_char(vdt_ctx, i*vdt_ctx->char_res_x_size, j*vdt_ctx->char_res_y_size, (c & 0xFF));
-						c++;
-					}
-				}
-*/
+
 				render_videotex(vdt_ctx);
 
 				bmp.xsize = vdt_ctx->bmp_res_x;
@@ -313,11 +398,40 @@ int main(int argc, char* argv[])
 			}
 			else
 			{
-				printf("ERROR : Can't open %s !\n",filename);
+				fprintf(stderr,"ERROR : Can't open %s !\n",filename);
 			}
 
 			deinit_videotex(vdt_ctx);
 		}
+	}
+
+	if(isOption(argc,argv,"ani",NULL)>0)
+	{
+		pal = 1;
+		if(isOption(argc,argv,"greyscale",NULL)>0)
+		{
+			pal = 0;
+		}
+
+		vdt_ctx = init_videotex();
+		if(vdt_ctx)
+		{
+			select_palette(vdt_ctx,pal);
+
+			load_charset(vdt_ctx, "font.bin");
+
+			i = 1;
+			while( i < argc)
+			{
+				if(argv[i][0] != '-')
+				{
+					animate(vdt_ctx,argv[i],20000,50*1,stdoutmode);
+				}
+				i++;
+			}
+			deinit_videotex(vdt_ctx);
+		}
+
 	}
 
 	if( (isOption(argc,argv,"help",0)<=0) &&
