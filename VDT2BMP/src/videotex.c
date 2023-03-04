@@ -46,12 +46,12 @@ videotex decoder.
 //#define DEBUG 1
 
 #ifdef DEBUG
-#define LOG(...) printf(__VA_ARGS__)
+#define LOG(...) fprintf(stderr,__VA_ARGS__)
 #else
 #define LOG(...)
 #endif
 
-#define ERROR(...) printf(__VA_ARGS__)
+#define ERROR(...) fprintf(stderr,__VA_ARGS__)
 
 const unsigned char special_char[][4]=
 {
