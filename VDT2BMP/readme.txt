@@ -1,9 +1,10 @@
 Videotex file (*.vdt) to bmp file converter
-(C) 2022 Jean-François DEL NERO
+(C) 2022-2023 Jean-François DEL NERO
 
-Usage Example : vdt2bmp -vdt:a_vdt_file.vdt -bmp:OUT.BMP
+Usage example : vdt2bmp -bmp:OUT.BMP a_vdt_file.vdt
 
 Available command line options :
-    -vdt:file                 : vdt file
-    -bmp:file                 : bmp file
-
+	a_vdt_file.vdt            : vdt file(s)
+	-bmp[:file]               : Generate bmp(s) file(s)
+	-ani                      : Simulate Minitel page loading.
+	-stdout                   : stdout mode (for piped ffmpeg compression)

@@ -27,13 +27,15 @@
 
 /*
 Videotex file (*.vdt) to bmp file converter
-(C) 2022 Jean-François DEL NERO
+(C) 2022-2023 Jean-François DEL NERO
 
-Usage example : vdt2bmp -vdt:a_vdt_file.vdt -bmp:OUT.BMP
+Usage example : vdt2bmp -bmp:OUT.BMP a_vdt_file.vdt
 
 Available command line options :
-	-vdt:file                 : vdt file
-	-bmp:file                 : bmp file
+	a_vdt_file.vdt            : vdt file(s)
+	-bmp[:file]               : Generate bmp(s) file(s)
+	-ani                      : Simulate Minitel page loading.
+	-stdout                   : stdout mode (for piped ffmpeg compression)
 
 */
 
@@ -222,13 +224,14 @@ int isOption(int argc, char* argv[],char * paramtosearch,char * argtoparam)
 void printhelp(char* argv[])
 {
 	fprintf(stderr,"Options:\n");
-	fprintf(stderr,"  -vdt:file \t\t\t: vdt file\n");
-	fprintf(stderr,"  -bmp:file \t\t\t: bmp file\n");
-
+	fprintf(stderr,"  -bmp[:out_file.bmp] \t\t: generate bmp file(s)\n");
+	fprintf(stderr,"  -ani\t\t\t\t: generate animation\n");
 	fprintf(stderr,"  -stdout \t\t\t: stdout mode\n");
-	fprintf(stderr,"  Example : /vdt2bmp -ani -stdout in1.vdt in2.vdt | ffmpeg -y -f rawvideo -pix_fmt argb -s 320x250 -r 50 -i - -an out_vid.mkv\n");
-
 	fprintf(stderr,"  -help \t\t\t: This help\n");
+	fprintf(stderr,"  \nExamples :\n");
+	fprintf(stderr,"  animation: vdt2bmp -ani -stdout /path/*.vdt | ffmpeg -y -f rawvideo -pix_fmt argb -s 320x250 -r 50 -i - -an out_vid.mkv\n");
+	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp /path/*.vdt\n");
+	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp:out.bmp /path/videotex.vdt\n");
 	fprintf(stderr,"\n");
 }
 
@@ -249,10 +252,19 @@ int animate(videotex_ctx * vdt_ctx, char * vdtfile,int frameperiod_us, int nb_pa
 
 	fprintf(stderr,"Generate animation from %s...\n",vdtfile);
 
+	memset(&fc,0,sizeof(file_cache));
+	tmp_buf = NULL;
+
 	if(open_file(&fc, vdtfile,0xFF)>=0)
 	{
-		tmp_buf = malloc(vdt_ctx->bmp_res_x * vdt_ctx->bmp_res_y * 4);
-		memset(tmp_buf,0,vdt_ctx->bmp_res_x * vdt_ctx->bmp_res_y * 4);
+		if(stdout_mode)
+		{
+			tmp_buf = malloc(vdt_ctx->bmp_res_x * vdt_ctx->bmp_res_y * 4);
+			if(!tmp_buf)
+				goto alloc_error;
+
+			memset(tmp_buf,0,vdt_ctx->bmp_res_x * vdt_ctx->bmp_res_y * 4);
+		}
 
 		offset = 0;
 		while(offset<fc.file_size || (pause_frames_cnt <= nb_pause_frames) )
@@ -301,7 +313,9 @@ int animate(videotex_ctx * vdt_ctx, char * vdtfile,int frameperiod_us, int nb_pa
 			offset++;
 		}
 
-		free(tmp_buf);
+		if(tmp_buf)
+			free(tmp_buf);
+
 		close_file(&fc);
 	}
 	else
@@ -311,6 +325,135 @@ int animate(videotex_ctx * vdt_ctx, char * vdtfile,int frameperiod_us, int nb_pa
 
 
 	return 0;
+
+alloc_error:
+	if(vdt_ctx)
+		deinit_videotex(vdt_ctx);
+
+	if(tmp_buf)
+		free(tmp_buf);
+
+	close_file(&fc);
+
+	return -3;
+}
+
+int write_bmp(char * vdt_file, char * bmp_file, int pal, int stdout_mode)
+{
+	char ofilename[512];
+	int offset;
+	int i;
+	videotex_ctx * vdt_ctx;
+	unsigned char * tmp_buf;
+	bitmap_data bmp;
+	file_cache fc;
+	int ret;
+
+	memset(&fc,0,sizeof(file_cache));
+	ret = 0;
+	tmp_buf = NULL;
+
+	vdt_ctx = init_videotex();
+	if(vdt_ctx)
+	{
+		if(stdout_mode)
+		{
+			tmp_buf = malloc(vdt_ctx->bmp_res_x * vdt_ctx->bmp_res_y * 4);
+			if(!tmp_buf)
+				goto alloc_error;
+
+			memset(tmp_buf,0,vdt_ctx->bmp_res_x * vdt_ctx->bmp_res_y * 4);
+		}
+
+		select_palette(vdt_ctx,pal);
+
+		load_charset(vdt_ctx, "font.bin");
+
+		if(!stdout_mode)
+		{
+			if(strlen(bmp_file))
+			{
+				strcpy(ofilename,bmp_file);
+			}
+			else
+			{
+				strcpy(ofilename,vdt_file);
+				i = 0;
+				while(ofilename[i])
+				{
+					if(ofilename[i] == '.')
+						ofilename[i] = '_';
+
+					i++;
+				}
+				strcat(ofilename,".bmp");
+			}
+
+			fprintf(stderr,"Write bmp file : %s from %s\n",ofilename,vdt_file);
+		}
+		else
+		{
+			fprintf(stderr,"Write raw data to stdout from %s\n", vdt_file);
+		}
+
+		if(open_file(&fc, vdt_file,0xFF)>=0)
+		{
+			offset = 0;
+			while(offset<fc.file_size)
+			{
+				push_char(vdt_ctx, get_byte(&fc,offset, NULL) );
+				offset++;
+			}
+
+			close_file(&fc);
+
+			render_videotex(vdt_ctx);
+
+			bmp.xsize = vdt_ctx->bmp_res_x;
+			bmp.ysize = vdt_ctx->bmp_res_y;
+			bmp.data = vdt_ctx->bmp_buffer;
+
+			if(!stdout_mode)
+				bmp24b_write(ofilename,&bmp);
+			else
+			{
+				for(i=0;i<(bmp.xsize * bmp.ysize);i++)
+				{
+					tmp_buf[(i*4)+1] = bmp.data[i] & 0xFF;
+					tmp_buf[(i*4)+2] = (bmp.data[i]>>8) & 0xFF;
+					tmp_buf[(i*4)+3] = (bmp.data[i]>>16) & 0xFF;
+				}
+				fwrite(tmp_buf, bmp.xsize * bmp.ysize * 4, 1, stdout);
+			}
+		}
+		else
+		{
+			fprintf(stderr,"ERROR : Can't open %s !\n",vdt_file);
+			ret = -1;
+		}
+
+		if(tmp_buf)
+			free(tmp_buf);
+
+		deinit_videotex(vdt_ctx);
+	}
+	else
+	{
+			ret = -2;
+	}
+
+	return ret;
+
+alloc_error:
+	if(vdt_ctx)
+		deinit_videotex(vdt_ctx);
+
+	if(tmp_buf)
+		free(tmp_buf);
+
+	close_file(&fc);
+
+	return -3;
 }
 
 int main(int argc, char* argv[])
@@ -318,12 +461,9 @@ int main(int argc, char* argv[])
 	char filename[512];
 	char ofilename[512];
 
-	int offset,pal,stdoutmode;
+	int pal,stdoutmode;
 	int i;
 	videotex_ctx * vdt_ctx;
-	bitmap_data bmp;
-
-	file_cache fc;
 
 	verbose = 0;
 	stdoutmode = 0;
@@ -357,14 +497,30 @@ int main(int argc, char* argv[])
 	memset(filename,0,sizeof(filename));
 
 	// Output file name option
-	strcpy(ofilename,"OUT.BMP");
-	isOption(argc,argv,"foutput",(char*)&ofilename);
+	strcpy(ofilename,"");
 
-	if(isOption(argc,argv,"vdt",(char*)&filename)>0)
+	if(isOption(argc,argv,"bmp",(char*)&ofilename))
 	{
+		pal = 1;
+		if(isOption(argc,argv,"greyscale",NULL)>0)
+		{
+			pal = 0;
+		}
+
+		i = 1;
+		while( i < argc)
+		{
+			if(argv[i][0] != '-')
+			{
+				write_bmp(argv[i], ofilename, pal,stdoutmode);
+			}
+
+			i++;
+		}
 	}
 
-	if(isOption(argc,argv,"bmp",(char*)&ofilename)>0)
+	// Animation generator
+	if(isOption(argc,argv,"ani",NULL)>0)
 	{
 		vdt_ctx = init_videotex();
 		if(vdt_ctx)
@@ -373,50 +529,6 @@ int main(int argc, char* argv[])
 			{
 				select_palette(vdt_ctx,0);
 			}
-
-			load_charset(vdt_ctx, "font.bin");
-
-			fprintf(stderr,"Write bmp file : %s from %s\n",ofilename,filename);
-
-			if(open_file(&fc, filename,0xFF)>=0)
-			{
-				offset = 0;
-				while(offset<fc.file_size)
-				{
-					push_char(vdt_ctx, get_byte(&fc,offset, NULL) );
-					offset++;
-				}
-
-				close_file(&fc);
-
-				render_videotex(vdt_ctx);
-
-				bmp.xsize = vdt_ctx->bmp_res_x;
-				bmp.ysize = vdt_ctx->bmp_res_y;
-				bmp.data = vdt_ctx->bmp_buffer;
-				bmp24b_write(ofilename,&bmp);
-			}
-			else
-			{
-				fprintf(stderr,"ERROR : Can't open %s !\n",filename);
-			}
-
-			deinit_videotex(vdt_ctx);
-		}
-	}
-
-	if(isOption(argc,argv,"ani",NULL)>0)
-	{
-		pal = 1;
-		if(isOption(argc,argv,"greyscale",NULL)>0)
-		{
-			pal = 0;
-		}
-
-		vdt_ctx = init_videotex();
-		if(vdt_ctx)
-		{
-			select_palette(vdt_ctx,pal);
 
 			load_charset(vdt_ctx, "font.bin");
 
@@ -431,11 +543,11 @@ int main(int argc, char* argv[])
 			}
 			deinit_videotex(vdt_ctx);
 		}
-
 	}
 
 	if( (isOption(argc,argv,"help",0)<=0) &&
 		(isOption(argc,argv,"vdt",0)<=0)  &&
+		(isOption(argc,argv,"ani",0)<=0)  &&
 		(isOption(argc,argv,"bmp",0)<=0) )
 	{
 		printhelp(argv);
