@@ -303,6 +303,7 @@ int draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,unsigned int attr
 	int rom_base,rom_bit_offset,mask_bit_offset;
 	int xfactor,yfactor;
 	int xoff;
+	int blink;
 	rom_base=0;
 	unsigned char * mask;
 	unsigned char * under_line_mask;
@@ -350,6 +351,7 @@ int draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,unsigned int attr
 	xfactor = get_mask(attributs, ATTRIBUTS_XZOOM_SHIFT, 1) + 1;
 	yfactor = get_mask(attributs, ATTRIBUTS_YZOOM_SHIFT, 1) + 1;
 	invert = get_mask(attributs, ATTRIBUTS_INVERT_SHIFT, 1);
+	blink = get_mask(attributs, ATTRIBUTS_BLINK_SHIFT, 1);
 
 	if(yfactor == 2)
 		y = y - ctx->char_res_y_size;
@@ -369,6 +371,14 @@ int draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,unsigned int attr
 				pix = 1;
 			else
 				pix = 0;
+
+			if(blink)
+			{
+				if(pix)
+				{
+					pix ^= (ctx->blink_state ^ invert);
+				}
+			}
 
 			if( mask[ (mask_bit_offset >> 3) ] & (0x80 >> (mask_bit_offset&7)) )
 				pix_mask = 0;
@@ -420,6 +430,13 @@ void render_videotex(videotex_ctx * ctx)
 	}
 
 	ctx->rendered_images_cnt++;
+
+	ctx->framecnt_blink++;
+	if( ctx->framecnt_blink >= ctx->framerate/2 )
+	{
+		ctx->framecnt_blink = 0;
+		ctx->blink_state ^= 0x01;
+	}
 }
 
 int move_cursor(videotex_ctx * ctx,int x,int y)

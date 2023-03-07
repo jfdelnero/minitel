@@ -66,6 +66,9 @@ typedef struct videotex_ctx_
 	uint32_t pages_cnt;
 	uint32_t rendered_images_cnt;
 
+	int framerate;
+	int framecnt_blink;
+	int blink_state;
 }videotex_ctx;
 
 #define ATTRIBUTS_FOREGROUND_C0LOR_MASK   0x7

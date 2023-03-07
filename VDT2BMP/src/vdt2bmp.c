@@ -393,7 +393,7 @@ int main(int argc, char* argv[])
 
 	verbose = 0;
 	stdoutmode = 0;
-	framerate = 25;
+	framerate = 30;
 
 	fprintf(stderr,"Minitel VDT to BMP converter v1.1.0.0\n");
 	fprintf(stderr,"Copyright (C) 2022-2023 Jean-Francois DEL NERO\n");
@@ -454,6 +454,8 @@ int main(int argc, char* argv[])
 		vdt_ctx = init_videotex();
 		if(vdt_ctx)
 		{
+			vdt_ctx->framerate = framerate;
+
 			if(isOption(argc,argv,"greyscale",NULL)>0)
 			{
 				select_palette(vdt_ctx,0);
