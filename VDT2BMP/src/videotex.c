@@ -432,7 +432,7 @@ void render_videotex(videotex_ctx * ctx)
 	ctx->rendered_images_cnt++;
 
 	ctx->framecnt_blink++;
-	if( ctx->framecnt_blink >= ctx->framerate/2 )
+	if( ctx->framecnt_blink >= ctx->framerate )
 	{
 		ctx->framecnt_blink = 0;
 		ctx->blink_state ^= 0x01;
