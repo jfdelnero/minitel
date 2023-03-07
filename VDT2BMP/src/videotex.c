@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2022 Jean-François DEL NERO
+// Copyright (C) 2022-2023 Jean-François DEL NERO
 //
 // This file is part of vdt2bmp.
 //
@@ -20,7 +20,7 @@
 //   See the GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with vdt2wav; if not, write to the Free Software
+// along with vdt2bmp; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 */
@@ -418,6 +418,8 @@ void render_videotex(videotex_ctx * ctx)
 			xpos += draw_char(ctx,xpos,j*ctx->char_res_y_size,ctx->char_buffer[(j*ctx->char_res_x) + i],ctx->attribut_buffer[(j*ctx->char_res_x) + i]);
 		}
 	}
+
+	ctx->rendered_images_cnt++;
 }
 
 int move_cursor(videotex_ctx * ctx,int x,int y)
@@ -568,6 +570,8 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 {
 	unsigned int i,tmp;
 	unsigned char tmp_char;
+
+	ctx->input_bytes_cnt++;
 
 	switch(ctx->decoder_state)
 	{

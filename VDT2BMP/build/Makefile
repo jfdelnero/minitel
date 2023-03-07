@@ -28,7 +28,7 @@ EXEC=vdt2bmp
 
 all: $(EXEC)
 
-vdt2bmp:  vdt2bmp.o videotex.o bmp_file.o
+vdt2bmp:  vdt2bmp.o videotex.o bmp_file.o cache.o modem.o
 	$(CC) -o $@    $^ $(LDFLAGS)
 
 vdt2bmp.o: ../src/vdt2bmp.c
@@ -38,6 +38,12 @@ videotex.o: ../src/videotex.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 bmp_file.o: ../src/bmp_file.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+cache.o: ../src/cache.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+modem.o: ../src/modem.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 clean:

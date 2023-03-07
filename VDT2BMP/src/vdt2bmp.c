@@ -20,7 +20,7 @@
 //   See the GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with vdt2wav; if not, write to the Free Software
+// along with vdt2bmp; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 */
@@ -46,120 +46,12 @@ Available command line options :
 
 #include <math.h>
 
+#include "cache.h"
 #include "videotex.h"
 #include "bmp_file.h"
+#include "modem.h"
 
 int verbose;
-
-#define FILE_CACHE_SIZE (1024)
-
-typedef struct file_cache_
-{
-	FILE * f;
-	int  current_offset;
-	int  cur_page_size;
-	int  file_size;
-	unsigned char cache_buffer[FILE_CACHE_SIZE];
-	int dirty;
-}file_cache;
-
-int open_file(file_cache * fc, char* path,unsigned char fill)
-{
-	memset(fc,0,sizeof(file_cache));
-
-	// Read mode
-	fc->f = fopen(path,"rb");
-	if(fc->f)
-	{
-		fseek(fc->f,0,SEEK_END);
-		fc->file_size = ftell(fc->f);
-		fseek(fc->f,fc->current_offset,SEEK_SET);
-
-		if(fc->current_offset + FILE_CACHE_SIZE > fc->file_size)
-			fc->cur_page_size = ( fc->file_size - fc->current_offset);
-		else
-			fc->cur_page_size = FILE_CACHE_SIZE;
-
-		memset(&fc->cache_buffer,fill,FILE_CACHE_SIZE);
-
-		if(!fc->file_size)
-			goto error;
-
-		if( fread(&fc->cache_buffer,fc->cur_page_size,1,fc->f) != 1 )
-			goto error;
-
-		return 0;
-	}
-
-
-
-	return -1;
-
-error:
-	if(fc->f)
-		fclose(fc->f);
-
-	fc->f = 0;
-
-	return -1;
-}
-
-unsigned char get_byte(file_cache * fc,int offset, int * success)
-{
-	unsigned char byte;
-	int ret;
-
-	byte = 0xFF;
-	ret = 1;
-
-	if(fc)
-	{
-		if(offset < fc->file_size)
-		{
-			if( ( offset >= fc->current_offset ) &&
-				( offset <  (fc->current_offset + FILE_CACHE_SIZE) ) )
-			{
-				byte = fc->cache_buffer[ offset - fc->current_offset ];
-			}
-			else
-			{
-				fc->current_offset = (offset & ~(FILE_CACHE_SIZE-1));
-				fseek(fc->f, fc->current_offset,SEEK_SET);
-
-				memset(&fc->cache_buffer,0xFF,FILE_CACHE_SIZE);
-
-				if(fc->current_offset + FILE_CACHE_SIZE < fc->file_size)
-					ret = fread(&fc->cache_buffer,FILE_CACHE_SIZE,1,fc->f);
-				else
-					ret = fread(&fc->cache_buffer,fc->file_size - fc->current_offset,1,fc->f);
-
-				byte = fc->cache_buffer[ offset - fc->current_offset ];
-			}
-		}
-	}
-
-	if(success)
-	{
-		*success = ret;
-	}
-
-	return byte;
-}
-
-void close_file(file_cache * fc)
-{
-	if(fc)
-	{
-		if(fc->f)
-		{
-			fclose(fc->f);
-
-			fc->f = NULL;
-		}
-	}
-
-	return;
-}
 
 int isOption(int argc, char* argv[],char * paramtosearch,char * argtoparam)
 {
@@ -235,20 +127,18 @@ void printhelp(char* argv[])
 	fprintf(stderr,"\n");
 }
 
-int animate(videotex_ctx * vdt_ctx, char * vdtfile,int frameperiod_us, int nb_pause_frames, int stdout_mode)
+int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,int framerate, int nb_pause_frames, int stdout_mode)
 {
 	char ofilename[512];
-	int offset,i;
+	int offset,i,totalsndsmp,next_pic_sndsmp,totalneededsamples;
 	bitmap_data bmp;
 	int image_nb,pause_frames_cnt;
-	uint32_t ani_time_us;
-	uint32_t next_pic_timeout_us;
 	file_cache fc;
 	unsigned char * tmp_buf;
 	image_nb = 0;
-	next_pic_timeout_us = 0;
-	ani_time_us = 0;
+
 	pause_frames_cnt = 0;
+	next_pic_sndsmp = 0;
 
 	fprintf(stderr,"Generate animation from %s...\n",vdtfile);
 
@@ -266,17 +156,36 @@ int animate(videotex_ctx * vdt_ctx, char * vdtfile,int frameperiod_us, int nb_pa
 			memset(tmp_buf,0,vdt_ctx->bmp_res_x * vdt_ctx->bmp_res_y * 4);
 		}
 
+		vdt_ctx->pages_cnt++;
+
+		totalsndsmp = 0;
 		offset = 0;
 		while(offset<fc.file_size || (pause_frames_cnt <= nb_pause_frames) )
 		{
 			if(offset<fc.file_size)
 			{
-				push_char(vdt_ctx, get_byte(&fc,offset, NULL) );
+				unsigned char c;
+
+				c = get_byte( &fc, offset, NULL );
+
+				mdm->tx_buffer_size = prepare_next_word( mdm, (int*)mdm->tx_buffer, c );
+				BitStreamToWave( mdm );
+				push_char( vdt_ctx, c );
+				write_wave_file("out.wav",mdm->wave_buf,mdm->wave_size,mdm->sample_rate);
+			}
+			else
+			{
+				for(i=0;i<64;i++)
+				{
+					mdm->tx_buffer[i] = 1;
+				}
+				BitStreamToWave( mdm );
+				write_wave_file("out.wav",mdm->wave_buf,mdm->wave_size,mdm->sample_rate);
 			}
 
-			ani_time_us += 8333; // 8.333 ms (1 / (1200 Baud / 10))
+			totalsndsmp += mdm->sample_offset;
 
-			if( ani_time_us >= next_pic_timeout_us )
+			if( totalsndsmp >= next_pic_sndsmp )
 			{
 				if(!stdout_mode)
 				{
@@ -308,9 +217,27 @@ int animate(videotex_ctx * vdt_ctx, char * vdtfile,int frameperiod_us, int nb_pa
 				if(!(offset<fc.file_size))
 					pause_frames_cnt++;
 
-				next_pic_timeout_us += frameperiod_us;
+				next_pic_sndsmp += (mdm->sample_rate / framerate);
+
 			}
 			offset++;
+		}
+
+		// Pad sound buffer...
+		totalneededsamples = ( ( (float)image_nb / (float)framerate) * (float)mdm->sample_rate);
+		while( totalsndsmp < totalneededsamples )
+		{
+			if( (totalneededsamples - totalsndsmp) > 64 )
+			{
+				mdm->wave_size = FillWaveBuff(mdm, 64,0);
+				totalsndsmp += 64;
+			}
+			else
+			{
+				mdm->wave_size = FillWaveBuff(mdm, (totalneededsamples - totalsndsmp),0);
+				totalsndsmp += (totalneededsamples - totalsndsmp);
+			}
+			write_wave_file("out.wav",mdm->wave_buf,mdm->wave_size,mdm->sample_rate);
 		}
 
 		if(tmp_buf)
@@ -322,7 +249,6 @@ int animate(videotex_ctx * vdt_ctx, char * vdtfile,int frameperiod_us, int nb_pa
 	{
 		fprintf(stderr,"ERROR : Can't open %s !\n",vdtfile);
 	}
-
 
 	return 0;
 
@@ -460,13 +386,14 @@ int main(int argc, char* argv[])
 {
 	char filename[512];
 	char ofilename[512];
-
+	modem_ctx mdm_ctx;
 	int pal,stdoutmode;
-	int i;
+	int i,framerate;
 	videotex_ctx * vdt_ctx;
 
 	verbose = 0;
 	stdoutmode = 0;
+	framerate = 25;
 
 	fprintf(stderr,"Minitel VDT to BMP converter v1.1.0.0\n");
 	fprintf(stderr,"Copyright (C) 2022-2023 Jean-Francois DEL NERO\n");
@@ -522,6 +449,8 @@ int main(int argc, char* argv[])
 	// Animation generator
 	if(isOption(argc,argv,"ani",NULL)>0)
 	{
+		init_modem(&mdm_ctx);
+
 		vdt_ctx = init_videotex();
 		if(vdt_ctx)
 		{
@@ -537,10 +466,20 @@ int main(int argc, char* argv[])
 			{
 				if(argv[i][0] != '-')
 				{
-					animate(vdt_ctx,argv[i],20000,50*1,stdoutmode);
+					animate(vdt_ctx,&mdm_ctx,argv[i],framerate,framerate*4,stdoutmode);
 				}
 				i++;
 			}
+
+			fprintf(stderr,"Videotex pages count : %d \n",vdt_ctx->pages_cnt);
+			fprintf(stderr,"Videotex input bytes count : %d \n",vdt_ctx->input_bytes_cnt);
+			fprintf(stderr,"Rendered images : %d \n",vdt_ctx->rendered_images_cnt);
+			fprintf(stderr,"Frame rate : %d fps \n",framerate);
+			fprintf(stderr,"Duration : %f ms \n",(float)((float)(vdt_ctx->rendered_images_cnt*1000)/(float)framerate));
+			fprintf(stderr,"Sound samples count : %d \n",mdm_ctx.samples_generated_cnt);
+			fprintf(stderr,"Sound duration : %f ms \n",((float)mdm_ctx.samples_generated_cnt/(float)mdm_ctx.sample_rate)*1000);
+			fprintf(stderr,"Video duration - Sound duration diff : %f ms \n",((float)((float)(vdt_ctx->rendered_images_cnt*1000)/(float)framerate)) - (((float)mdm_ctx.samples_generated_cnt/(float)mdm_ctx.sample_rate)*1000));
+
 			deinit_videotex(vdt_ctx);
 		}
 	}

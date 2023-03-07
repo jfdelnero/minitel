@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2022 Jean-François DEL NERO
+// Copyright (C) 2022-2023 Jean-François DEL NERO
 //
 // This file is part of vdt2bmp.
 //
@@ -20,7 +20,7 @@
 //   See the GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with vdt2wav; if not, write to the Free Software
+// along with vdt2bmp; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 */
@@ -61,6 +61,10 @@ typedef struct videotex_ctx_
 	unsigned int  current_attributs;
 
 	unsigned int palette[8];
+
+	uint32_t input_bytes_cnt;
+	uint32_t pages_cnt;
+	uint32_t rendered_images_cnt;
 
 }videotex_ctx;
 
