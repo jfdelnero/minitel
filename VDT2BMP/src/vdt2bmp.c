@@ -158,6 +158,9 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,int framerate
 
 		vdt_ctx->pages_cnt++;
 
+		mdm->next_bitlimit = mdm->bit_time;
+		mdm->sample_offset = 0;
+
 		totalsndsmp = 0;
 		offset = 0;
 		while(offset<fc.file_size || (pause_frames_cnt <= nb_pause_frames) )

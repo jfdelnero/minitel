@@ -203,6 +203,12 @@ int FillWaveBuff(modem_ctx *mdm, int size,int offset)
 {
 	int i;
 
+	if(mdm->Frequency!=0 && (mdm->Frequency!=mdm->OldFrequency))
+	{   // Sync the frequency change...
+		mdm->sinoffset = (mdm->OldFrequency*mdm->sinoffset) / mdm->Frequency;
+		mdm->OldFrequency = mdm->Frequency;
+	}
+
 	i = 0;
 	while( i < size )
 	{
@@ -239,12 +245,6 @@ int BitStreamToWave(modem_ctx *mdm)
 			default:
 				mdm->Frequency = mdm->idle_freq;
 			break;
-		}
-
-		if(mdm->Frequency!=0 && (mdm->Frequency!=mdm->OldFrequency))
-		{   // Sync the frequency change...
-			mdm->sinoffset = (mdm->OldFrequency*mdm->sinoffset) / mdm->Frequency;
-			mdm->OldFrequency = mdm->Frequency;
 		}
 
 		j = FillWaveBuff(mdm, ((int)mdm->next_bitlimit - mdm->sample_offset), j);
