@@ -296,7 +296,7 @@ int write_bmp(char * vdt_file, char * bmp_file, int pal, int stdout_mode)
 
 		select_palette(vdt_ctx,pal);
 
-		load_charset(vdt_ctx, "font.bin");
+		load_charset(vdt_ctx,  NULL);
 
 		if(!stdout_mode)
 		{
@@ -464,7 +464,7 @@ int main(int argc, char* argv[])
 				select_palette(vdt_ctx,0);
 			}
 
-			load_charset(vdt_ctx, "font.bin");
+			load_charset(vdt_ctx, NULL);
 
 			i = 1;
 			while( i < argc)

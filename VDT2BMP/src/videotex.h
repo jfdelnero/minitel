@@ -69,6 +69,10 @@ typedef struct videotex_ctx_
 	int framerate;
 	int framecnt_blink;
 	int blink_state;
+
+	int jpg_rx_cnt;
+	unsigned short jpg_size;
+
 }videotex_ctx;
 
 #define ATTRIBUTS_FOREGROUND_C0LOR_MASK   0x7

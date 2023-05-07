@@ -28,7 +28,7 @@ EXEC=vdt2bmp
 
 all: $(EXEC)
 
-vdt2bmp:  vdt2bmp.o videotex.o bmp_file.o cache.o modem.o
+vdt2bmp:  vdt2bmp.o videotex.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o
 	$(CC) -o $@    $^ $(LDFLAGS)
 
 vdt2bmp.o: ../src/vdt2bmp.c
@@ -44,6 +44,12 @@ cache.o: ../src/cache.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 modem.o: ../src/modem.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+teletel_font.o: ../src/teletel_font.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+ef9345_font.o: ../src/ef9345_font.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 clean:

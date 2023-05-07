@@ -39,6 +39,8 @@ videotex decoder.
 
 #include "videotex.h"
 
+#include "fonts.h"
+
 // Minitel resolution :
 // 40x25 characters
 // 8x10 character size
@@ -261,28 +263,40 @@ int load_charset(videotex_ctx * ctx, char * file)
 
 	if(ctx)
 	{
-		f = fopen(file,"rb");
-		if(f)
+		if( file )
 		{
-			fseek(f,0,SEEK_END);
-
-			size = ftell(f);
-
-			fseek(f,0,SEEK_SET);
-
-			if(size)
+			f = fopen(file,"rb");
+			if(f)
 			{
-				if(ctx->charset)
-					free(ctx->charset);
+				fseek(f,0,SEEK_END);
 
-				ctx->charset = malloc(size);
-				if(ctx->charset)
+				size = ftell(f);
+
+				fseek(f,0,SEEK_SET);
+
+				if(size)
 				{
-					ret = fread(ctx->charset,size,1,f);
-				}
-			}
+					if(ctx->charset)
+						free(ctx->charset);
 
-			fclose(f);
+					ctx->charset = malloc(size);
+					if(ctx->charset)
+					{
+						ret = fread(ctx->charset,size,1,f);
+					}
+				}
+
+				fclose(f);
+			}
+		}
+		else
+		{
+			size = sizeof(font_teletel);
+			ctx->charset = malloc(size);
+			if(ctx->charset)
+			{
+				memcpy(ctx->charset,font_teletel,size);
+			}
 		}
 	}
 
@@ -739,6 +753,10 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 		break;
 
 		case 0x1B:
+			uint32_t next_decoder_state;
+
+			next_decoder_state = 0x00;
+
 			LOG("Escape %.2X\n",c);
 
 			switch(c)
@@ -823,6 +841,12 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 					LOG("demande de position\n");
 				break;
 
+				case 0x70:
+					LOG("Minitel Photo JPEG image...\n");
+					next_decoder_state = 0x70;
+					ctx->jpg_rx_cnt = 0;
+				break;
+
 				default:
 					if(c >= 0x40 && c <= 0x47)
 					{
@@ -845,7 +869,8 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 					}
 				break;
 			}
-			ctx->decoder_state = 0x00;
+
+			ctx->decoder_state = next_decoder_state;
 		break;
 		case 0x1F:
 			ctx->decoder_step++;
@@ -858,10 +883,42 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 				resetstate(ctx);
 			}
 		break;
+		case 0x70:
+			// JPEG download...
+
+			// 0x1B 0x70 PICT_MODE FORMAT_ID ?? ?? ?? ?? ?? JPEG_DATA
+			switch(ctx->jpg_rx_cnt)
+			{
+				case 0x0: // MSB Size
+					ctx->jpg_size = (uint16_t)(c)<<8;
+					ctx->jpg_rx_cnt++;
+
+				break;
+				case 0x1: // LSB Size
+					ctx->jpg_size |= c;
+
+					if(!ctx->jpg_size)
+						ctx->decoder_state = 0x00;
+
+					LOG("JPEG data size : 0x%X...\n",ctx->jpg_size);
+					ctx->jpg_rx_cnt++;
+
+				break;
+				default:
+					// Consume the data...
+
+					ctx->jpg_size--;
+					LOG("0x%X... 0x%.2X\n",ctx->jpg_size,c);
+
+					if(!ctx->jpg_size)
+						ctx->decoder_state = 0x00;
+
+				break;
+			}
+		break;
 		default:
 			ERROR("UNSUPPORTED STATE: 0x%.2X\n",c);
 		break;
-
 	}
 }
 
