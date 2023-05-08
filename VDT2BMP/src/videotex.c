@@ -260,6 +260,7 @@ int load_charset(videotex_ctx * ctx, char * file)
 	int size,ret;
 
 	ret = 0;
+	size = 0;
 
 	if(ctx)
 	{
@@ -298,6 +299,34 @@ int load_charset(videotex_ctx * ctx, char * file)
 				memcpy(ctx->charset,font_teletel,size);
 			}
 		}
+
+#if 0
+		if(ctx->charset && size)
+		{
+			int i,j;
+
+			f = fopen("expanded_font.raw","wb");
+			if(f)
+			{
+				for(i=0;i<size;i++)
+				{
+					for(j=0;j<8;j++)
+					{
+						if( ctx->charset[i] & (0x80>>j) )
+						{
+							fputc(0xFF,f);
+						}
+						else
+						{
+							fputc(0x00,f);
+						}
+					}
+				}
+				fclose(f);
+			}
+		}
+#endif
+
 	}
 
 	return ret;
