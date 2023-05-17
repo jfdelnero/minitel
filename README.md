@@ -1,3 +1,24 @@
+# Minitel terminal projects
+
+This repository contains some projects related to the French Minitel terminal :
+Ce dépot contient différents projets en lien avec le Minitel :
+
+doc/ :
+
+Minitel hardware and firmware hack study.
+
+minitel2/ :
+
+Minitel ROM software and graphical demo example.
+
+Minitel_VDT2WAV/ :
+
+Vidéotex files (*.VDT) to audio WAV files encoder : Generate V.23 audio signal to replay videotex pages on the real hardware.
+
+VDT2BMP/ :
+
+Vidéotex files (*.vdt) to BMP and WAV files. Contains an Vidéotex emulator and generate V.23 audio signal to replay from a video file videotex pages on the real hardware. It is able to generate video files from multiples VDT files.
+
 # Etude technique du Minitel
 
 Le but de cette projet est de présenter les résultats de l'étude technique du Minitel que j'ai réalisé il y a quelques années.
