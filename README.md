@@ -8,15 +8,15 @@ Ce dépot contient différents projets en lien avec le Minitel.
 
 Minitel hardware and firmware hack study.
 
-**minitel2/**
+[**minitel2/**](minitel2/)
 
 Minitel ROM software and graphical demo example.
 
-**Minitel_VDT2WAV/**
+[**Minitel_VDT2WAV/**](Minitel_VDT2WAV/)
 
 Vidéotex files (*.VDT) to audio WAV files encoder : Generate V.23 audio signal to replay videotex pages on the real hardware.
 
-**VDT2BMP/**
+[**VDT2BMP/**](VDT2BMP/)
 
 Vidéotex files (*.vdt) to BMP and WAV files. Contains an Vidéotex emulator and generate V.23 audio signal to replay from a video file videotex pages on the real hardware. It is able to generate video files from multiples VDT files.
 
