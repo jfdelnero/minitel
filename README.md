@@ -4,7 +4,7 @@ This repository contains some projects related to the French Minitel terminal.
 
 Ce dépot contient différents projets en lien avec le Minitel.
 
-**doc/**
+[**doc/**](doc/)
 
 Minitel hardware and firmware hack study.
 
