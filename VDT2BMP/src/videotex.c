@@ -193,6 +193,17 @@ void select_palette(videotex_ctx * ctx, int pal_id)
 	}
 }
 
+int set_cursor(videotex_ctx * ctx,unsigned mask,int x,int y)
+{
+	if(mask&1)
+		ctx->cursor_x_pos = x;
+
+	if(mask&2)
+		ctx->cursor_y_pos = y;
+
+	return 0;
+}
+
 videotex_ctx * init_videotex()
 {
 	videotex_ctx * ctx;
@@ -686,17 +697,6 @@ int move_cursor(videotex_ctx * ctx,int x,int y)
 	{
 		ctx->cursor_y_pos = 1;
 	}
-
-	return 0;
-}
-
-int set_cursor(videotex_ctx * ctx,unsigned mask,int x,int y)
-{
-	if(mask&1)
-		ctx->cursor_x_pos = x;
-
-	if(mask&2)
-		ctx->cursor_y_pos = y;
 
 	return 0;
 }
