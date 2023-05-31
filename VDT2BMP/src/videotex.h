@@ -41,12 +41,14 @@ typedef struct videotex_ctx_
 	int char_res_y_size;
 
 	unsigned char * char_buffer;
-	unsigned int  * attribut_buffer;
+	uint32_t * attribut_buffer;
+	uint32_t * prev_raw_attributs;
 
 	uint32_t * bmp_buffer;
 	int bmp_res_x;
 	int bmp_res_y;
 
+	int charset_size;
 	unsigned char * charset;
 
 	int cursor_x_pos;
@@ -59,6 +61,7 @@ typedef struct videotex_ctx_
 	unsigned char last_char;
 
 	unsigned int  current_attributs;
+	unsigned int  underline_latch;
 
 	unsigned int palette[8];
 

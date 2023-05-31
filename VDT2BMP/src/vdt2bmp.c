@@ -398,7 +398,7 @@ int main(int argc, char* argv[])
 	stdoutmode = 0;
 	framerate = 30;
 
-	fprintf(stderr,"Minitel VDT to BMP converter v1.1.0.0\n");
+	fprintf(stderr,"Minitel VDT to BMP converter v1.2.0.0\n");
 	fprintf(stderr,"Copyright (C) 2022-2023 Jean-Francois DEL NERO\n");
 	fprintf(stderr,"This program comes with ABSOLUTELY NO WARRANTY\n");
 	fprintf(stderr,"This is free software, and you are welcome to redistribute it\n");
