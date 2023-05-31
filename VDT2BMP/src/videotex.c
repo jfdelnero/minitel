@@ -789,9 +789,16 @@ void print_char(videotex_ctx * ctx,unsigned char c)
 
 int fill_line(videotex_ctx * ctx, unsigned char c)
 {
+	int tmp_x;
+
 	while( ctx->cursor_x_pos < ctx->char_res_x - 1 )
 	{
+		tmp_x = ctx->cursor_x_pos;
 		print_char(ctx,c);
+		if( ctx->cursor_x_pos <= tmp_x )
+		{
+			return 0;
+		}
 	};
 
 	print_char(ctx,c);
