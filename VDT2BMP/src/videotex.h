@@ -69,7 +69,7 @@ typedef struct videotex_ctx_
 	uint32_t pages_cnt;
 	uint32_t rendered_images_cnt;
 
-	int framerate;
+	float framerate;
 	int framecnt_blink;
 	int blink_state;
 

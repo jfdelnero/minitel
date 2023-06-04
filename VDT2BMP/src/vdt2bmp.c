@@ -51,6 +51,8 @@ Available command line options :
 #include "bmp_file.h"
 #include "modem.h"
 
+#define DEFAULT_SOUND_FILE "out_audio.wav"
+
 int verbose;
 
 int isOption(int argc, char* argv[],char * paramtosearch,char * argtoparam)
@@ -60,18 +62,19 @@ int isOption(int argc, char* argv[],char * paramtosearch,char * argtoparam)
 
 	char option[512];
 
-	memset(option,0,512);
+	memset(option,0,sizeof(option));
+
 	while(param<=argc)
 	{
 		if(argv[param])
 		{
 			if(argv[param][0]=='-')
 			{
-				memset(option,0,512);
+				memset(option,0,sizeof(option));
 
 				j=0;
 				i=1;
-				while( argv[param][i] && argv[param][i]!=':')
+				while( argv[param][i] && argv[param][i]!=':' && ( j < (sizeof(option) - 1)) )
 				{
 					option[j]=argv[param][i];
 					i++;
@@ -82,11 +85,13 @@ int isOption(int argc, char* argv[],char * paramtosearch,char * argtoparam)
 				{
 					if(argtoparam)
 					{
+						argtoparam[0] = 0;
+
 						if(argv[param][i]==':')
 						{
 							i++;
 							j=0;
-							while( argv[param][i] )
+							while( argv[param][i] && j < (512 - 1) )
 							{
 								argtoparam[j]=argv[param][i];
 								i++;
@@ -121,13 +126,14 @@ void printhelp(char* argv[])
 	fprintf(stderr,"  -stdout \t\t\t: stdout mode\n");
 	fprintf(stderr,"  -help \t\t\t: This help\n");
 	fprintf(stderr,"  \nExamples :\n");
-	fprintf(stderr,"  animation: vdt2bmp -ani -stdout /path/*.vdt | ffmpeg -y -f rawvideo -pix_fmt argb -s 320x250 -r 50 -i - -an out_vid.mkv\n");
+	fprintf(stderr,"  animation: vdt2bmp -ani -fps:30 -stdout /path/*.vdt | ffmpeg -y -f rawvideo -pix_fmt argb -s 320x250 -r 30 -i - -an out_video.mkv\n");
+	fprintf(stderr,"  video + audio merging : ffmpeg -i out_video.mkv -i out_audio.wav -c copy output.mkv\n");	
 	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp /path/*.vdt\n");
 	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp:out.bmp /path/videotex.vdt\n");
 	fprintf(stderr,"\n");
 }
 
-int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,int framerate, int nb_pause_frames, int stdout_mode)
+int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framerate, int nb_pause_frames, int stdout_mode)
 {
 	char ofilename[512];
 	int offset,i,totalsndsmp,next_pic_sndsmp,totalneededsamples;
@@ -174,7 +180,7 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,int framerate
 				mdm->tx_buffer_size = prepare_next_word( mdm, (int*)mdm->tx_buffer, c );
 				BitStreamToWave( mdm );
 				push_char( vdt_ctx, c );
-				write_wave_file("out.wav",mdm->wave_buf,mdm->wave_size,mdm->sample_rate);
+				write_wave_file(DEFAULT_SOUND_FILE,mdm->wave_buf,mdm->wave_size,mdm->sample_rate);
 			}
 			else
 			{
@@ -183,7 +189,7 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,int framerate
 					mdm->tx_buffer[i] = 1;
 				}
 				BitStreamToWave( mdm );
-				write_wave_file("out.wav",mdm->wave_buf,mdm->wave_size,mdm->sample_rate);
+				write_wave_file(DEFAULT_SOUND_FILE,mdm->wave_buf,mdm->wave_size,mdm->sample_rate);
 			}
 
 			totalsndsmp += mdm->sample_offset;
@@ -220,14 +226,13 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,int framerate
 				if(!(offset<fc.file_size))
 					pause_frames_cnt++;
 
-				next_pic_sndsmp += (mdm->sample_rate / framerate);
-
+				next_pic_sndsmp = (int)(((double)mdm->sample_rate / (double)framerate) * image_nb);
 			}
 			offset++;
 		}
 
 		// Pad sound buffer...
-		totalneededsamples = ( ( (float)image_nb / (float)framerate) * (float)mdm->sample_rate);
+		totalneededsamples = (int)( ( (float)image_nb / (float)framerate) * (float)mdm->sample_rate);
 		while( totalsndsmp < totalneededsamples )
 		{
 			if( (totalneededsamples - totalsndsmp) > 64 )
@@ -240,7 +245,7 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,int framerate
 				mdm->wave_size = FillWaveBuff(mdm, (totalneededsamples - totalsndsmp),0);
 				totalsndsmp += (totalneededsamples - totalsndsmp);
 			}
-			write_wave_file("out.wav",mdm->wave_buf,mdm->wave_size,mdm->sample_rate);
+			write_wave_file(DEFAULT_SOUND_FILE,mdm->wave_buf,mdm->wave_size,mdm->sample_rate);
 		}
 
 		if(tmp_buf)
@@ -389,14 +394,16 @@ int main(int argc, char* argv[])
 {
 	char filename[512];
 	char ofilename[512];
+	char strtmp[512];
 	modem_ctx mdm_ctx;
 	int pal,stdoutmode;
-	int i,framerate;
+	int i;
+	float framerate;
 	videotex_ctx * vdt_ctx;
 
 	verbose = 0;
 	stdoutmode = 0;
-	framerate = 30;
+	framerate = 30.0;
 
 	fprintf(stderr,"Minitel VDT to BMP converter v1.2.0.0\n");
 	fprintf(stderr,"Copyright (C) 2022-2023 Jean-Francois DEL NERO\n");
@@ -428,6 +435,11 @@ int main(int argc, char* argv[])
 
 	// Output file name option
 	strcpy(ofilename,"");
+
+	if(isOption(argc,argv,"fps",(char*)&strtmp))
+	{
+		framerate = atof(strtmp);
+	}
 
 	if(isOption(argc,argv,"bmp",(char*)&ofilename))
 	{
@@ -466,12 +478,14 @@ int main(int argc, char* argv[])
 
 			load_charset(vdt_ctx, NULL);
 
+			remove(DEFAULT_SOUND_FILE);
+
 			i = 1;
 			while( i < argc)
 			{
 				if(argv[i][0] != '-')
 				{
-					animate(vdt_ctx,&mdm_ctx,argv[i],framerate,framerate*4,stdoutmode);
+					animate(vdt_ctx,&mdm_ctx,argv[i],framerate,(int)(framerate*4),stdoutmode);
 				}
 				i++;
 			}
@@ -479,7 +493,7 @@ int main(int argc, char* argv[])
 			fprintf(stderr,"Videotex pages count : %d \n",vdt_ctx->pages_cnt);
 			fprintf(stderr,"Videotex input bytes count : %d \n",vdt_ctx->input_bytes_cnt);
 			fprintf(stderr,"Rendered images : %d \n",vdt_ctx->rendered_images_cnt);
-			fprintf(stderr,"Frame rate : %d fps \n",framerate);
+			fprintf(stderr,"Frame rate : %.2f fps \n",framerate);
 			fprintf(stderr,"Duration : %f ms \n",(float)((float)(vdt_ctx->rendered_images_cnt*1000)/(float)framerate));
 			fprintf(stderr,"Sound samples count : %d \n",mdm_ctx.samples_generated_cnt);
 			fprintf(stderr,"Sound duration : %f ms \n",((float)mdm_ctx.samples_generated_cnt/(float)mdm_ctx.sample_rate)*1000);
