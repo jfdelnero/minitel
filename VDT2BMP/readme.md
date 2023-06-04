@@ -9,5 +9,5 @@ Available command line options :
 	-ani                      : Simulate Minitel page loading.
 	-stdout                   : stdout mode (for piped ffmpeg compression)
 
-[![Watch the video](hxc2001.free.fr/minitel/pages_minitel/minitel_etam.png)](hxc2001.free.fr/minitel/pages_minitel/minitel_etam.mp4)
+[![Watch the video](http://hxc2001.free.fr/minitel/pages_minitel/minitel_etam.png)](http://hxc2001.free.fr/minitel/pages_minitel/minitel_etam.mp4)
 
