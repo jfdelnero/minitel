@@ -34,6 +34,16 @@
 #define PI 3.1415926535897932384626433832795
 #endif
 
+#define SERIAL_RX_FIFO_SIZE 1024
+
+typedef struct serial_rx_fifo_
+{
+	int in_ptr;
+	int out_ptr;
+
+	unsigned char fifo[SERIAL_RX_FIFO_SIZE];
+}serial_rx_fifo;
+
 typedef struct mean_ctx_
 {
 	float mean_h[512];
@@ -104,6 +114,9 @@ typedef struct modem_ctx_
 	unsigned short serial_rx_shiftreg;
 	int serial_rx_parbitcnt;
 	int serial_rx_cnt;
+
+	serial_rx_fifo rx_fifo;
+
 }modem_ctx;
 
 void init_modem(modem_ctx *mdm);
@@ -112,3 +125,5 @@ int prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte);
 int FillWaveBuff(modem_ctx *mdm, int size,int offset);
 int BitStreamToWave(modem_ctx *mdm);
 void demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wavebuf,int samplescnt);
+int push_to_rx_fifo(modem_ctx *mdm, unsigned char c);
+int pop_rx_fifo(modem_ctx *mdm, unsigned char * c);

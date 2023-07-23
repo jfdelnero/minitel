@@ -199,6 +199,39 @@ int prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte)
 	return tx_buffer_size;
 }
 
+int push_to_rx_fifo(modem_ctx *mdm, unsigned char c)
+{
+	int ret;
+
+	ret = 0;
+	mdm->rx_fifo.fifo[(mdm->rx_fifo.in_ptr & (SERIAL_RX_FIFO_SIZE-1))] = c;
+
+	mdm->rx_fifo.in_ptr = (mdm->rx_fifo.in_ptr + 1) & (SERIAL_RX_FIFO_SIZE-1);
+	if( ( mdm->rx_fifo.in_ptr & (SERIAL_RX_FIFO_SIZE-1) ) == ( mdm->rx_fifo.out_ptr & (SERIAL_RX_FIFO_SIZE-1) ) )
+	{
+		mdm->rx_fifo.out_ptr = (mdm->rx_fifo.out_ptr + 1) & (SERIAL_RX_FIFO_SIZE-1);
+		ret = 1;
+	}
+
+	return ret;
+}
+
+int pop_rx_fifo(modem_ctx *mdm, unsigned char * c)
+{
+	int ret;
+
+	ret = 0;
+
+	if( ( mdm->rx_fifo.in_ptr & (SERIAL_RX_FIFO_SIZE-1) ) != ( mdm->rx_fifo.out_ptr & (SERIAL_RX_FIFO_SIZE-1) ) )
+	{
+		*c = mdm->rx_fifo.fifo[(mdm->rx_fifo.out_ptr & (SERIAL_RX_FIFO_SIZE-1))];
+		mdm->rx_fifo.out_ptr = (mdm->rx_fifo.out_ptr + 1) & (SERIAL_RX_FIFO_SIZE-1);
+		ret = 1;
+	}
+
+	return ret;
+}
+
 int serial_rx(modem_ctx *mdm, int state)
 {
 	unsigned char mask;
@@ -272,6 +305,9 @@ int serial_rx(modem_ctx *mdm, int state)
 		case 3: // Stop bit
 			mdm->serial_rx_state = 0;
 			mdm->serial_rx_delay = 0;
+
+			push_to_rx_fifo(mdm, mdm->serial_rx_shiftreg);
+
 #if 0
 			printf("RX : 0x%.2X\n",mdm->serial_rx_shiftreg);
 #endif
