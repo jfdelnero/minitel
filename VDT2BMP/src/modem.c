@@ -257,8 +257,149 @@ int BitStreamToWave(modem_ctx *mdm)
 	return cnt;
 }
 
+// ----------------------------------------------------------------------------------------------
+//
+// Correlation demodulator
+// (!! This not the currently implemented method !!)
+// The correlator multiplies an input signal by a delayed copy of itself.
+//
+//                                                      _____       ______
+//                                 |------------------>|     |     |      |
+//           ____________________  |  __________       |     |     |      |
+//          |                    | | |          |      | Xor |---->|Filter|-----> To UART Input
+//Signal--->| Analog to Digital  |-->|  Delay   |----->|     |     |      |
+//          |   (Comparator>0)   |   |__________|      |_____|     |______|
+//          |____________________|
+//
+// Delay selection :
+//
+// Example :
+// HF = 2100Hz;
+// LF = 1300Hz;
+// COS(2*PI()*LF*delay) - COS(2*PI()*HF*delay) = diff
+// Take the delay value having the higher diff value.
+//
+// ----------------------------------------------------------------------------------------------
+// Quadrature Non-coherent FSK receiver
+// (Implemented)
+//                          _____         _________        _________
+//                         |     |       |         |      |         |
+//           |------------>| MUL |------>|   AVG   |----->|   ^2    |------|
+//           |             |_____|       |_________|      |_________|   ___v__
+//           |                 ^SIN                                    |      |
+//           |                 |                                       |  ADD |---------|
+//           |       _____     |          _________        _________   |______|         |
+//           |      |     |    |         |         |      |         |      ^            |
+//           |----->| MUL |------------->|   AVG   |----->|   ^2    |------|            |
+//           |      |_____|    |         |_________|      |_________|                   |
+//           |        ^COS     |                                                        |
+//           |        |        |                                                        |
+//           |        |        |                                                        |
+//           |       _|___     |                                                        |
+//           |      |     |____|                                                     ___v___       _________
+//   RX      |      | OSC |                                                         |  ADD  |     |         |
+// Signal -->|      |  f1 |                                                         |       |---->| Compare |----> To UART Input
+//           |      |_____|                                                         |__SUB__|     |_________|
+//           |                                                                          ^
+//           |                                                                          |
+//           |                                                                          |
+//           |              _____         _________        _________                    |
+//           |             |     |       |         |      |         |                   |
+//           |------------>| MUL |------>|   AVG   |----->|   ^2    |------|            |
+//           |             |_____|       |_________|      |_________|   ___v__          |
+//           |                 ^SIN                                    |      |         |
+//           |                 |                                       |  ADD |---------|
+//           |       _____     |          _________        _________   |______|
+//           |      |     |    |         |         |      |         |      ^
+//           |----->| MUL |------------->|   AVG   |----->|   ^2    |------|
+//                  |_____|    |         |_________|      |_________|
+//                    ^COS     |
+//                    |        |
+//                    |        |
+//                   _|___     |
+//                  |     |____|
+//                  | OSC |
+//                  |  f2 |
+//                  |_____|
+//
+
+float add_and_compute_mean(mean_ctx * ctx, float val)
+{
+	int i;
+	float result;
+
+	ctx->mean_h[ctx->mean_wr_idx++] = val;
+
+	if( ctx->mean_wr_idx >= ctx->mean_max_idx)
+		ctx->mean_wr_idx = 0;
+
+	result = 0;
+	for(i=0;i<ctx->mean_max_idx;i++)
+	{
+		result += ctx->mean_h[i];
+	}
+
+	result /= ctx->mean_max_idx;
+
+	ctx->mean = result;
+
+	return result;
+}
+
+void demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wavebuf,int samplescnt)
+{
+	int i,j;
+	int bit;
+	float mul_freq;
+	float f1_sincos,result;
+
+	for(i=0;i<samplescnt;i++)
+	{
+		for(j=0;j<4;j++)
+		{
+			f1_sincos = sinf((double)(((double)2*(double)PI*((double)mdm_dmt->freqs[j>>1] )*(double)mdm_dmt->sinoffs)/(double)mdm_dmt->sample_rate) + ((PI/2.0)*(j&1)) );
+
+			mul_freq = f1_sincos * (float)(wavebuf[i]/(float)32765);
+
+			mdm_dmt->mul[j] = f1_sincos;
+
+			mdm_dmt->old_integrator_res[j] =  (((float)mdm_dmt->old_integrator_res[j]) * 0.9) + mul_freq;
+
+			mdm_dmt->power[j] = mdm_dmt->old_integrator_res[j] * mdm_dmt->old_integrator_res[j];
+
+			add_and_compute_mean(&mdm_dmt->mean[j], mdm_dmt->power[j]);
+		}
+
+		for(j=0;j<2;j++)
+		{
+			mdm_dmt->add[j] = mdm_dmt->mean[j*2].mean + mdm_dmt->mean[(j*2)+1].mean;
+		}
+
+		result = mdm_dmt->add[1] - mdm_dmt->add[0];
+
+		bit = 0;
+		if(result>=0)
+			bit = 1;
+
+		if( (bit != mdm_dmt->oldbit) && !bit )
+		{
+			// Start bit ?
+
+		}
+
+#if 0
+		printf("%f;%f;%f;%f;%f;%f;%f;%d\n",mdm_dmt->power[0],mdm_dmt->power[1],mdm_dmt->power[2],mdm_dmt->power[3],mdm_dmt->add[0],mdm_dmt->add[1],result,bit);
+#endif
+		mdm_dmt->oldbit = bit;
+
+		mdm_dmt->sinoffs++;
+	}
+}
+
 void init_modem(modem_ctx *mdm)
 {
+	int i;
+
 	if(mdm)
 	{
 		memset(mdm,0,sizeof(modem_ctx));
@@ -276,6 +417,15 @@ void init_modem(modem_ctx *mdm)
 		mdm->baud_rate = 1200;
 		mdm->bit_time =  ((float)mdm->sample_rate / (float)mdm->baud_rate);
 		mdm->Amplitude = (int)(32767 * (float)((float)80/100));
+
+		mdm->demodulators[0].freqs[0] = 2100;
+		mdm->demodulators[0].freqs[1] = 1300;
+		mdm->demodulators[0].sample_rate = DEFAULT_SAMPLERATE;
+
+		for(i=0;i<4;i++)
+		{
+			mdm->demodulators[0].mean[i].mean_max_idx = (int)((float)((mdm->sample_rate / mdm->baud_rate)) * 0.75);
+		}
 
 		mdm->wave_buf = malloc(256 * 1024 * sizeof(short));
 		if(mdm->wave_buf )

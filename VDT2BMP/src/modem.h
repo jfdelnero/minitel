@@ -34,6 +34,31 @@
 #define PI 3.1415926535897932384626433832795
 #endif
 
+typedef struct mean_ctx_
+{
+	float mean_h[512];
+	int  mean_wr_idx;
+	int  mean_max_idx;
+
+	float mean;
+}mean_ctx;
+
+typedef struct modem_demodulator_ctx_
+{
+	unsigned int freqs[2];
+
+	unsigned int sample_rate;
+	unsigned int sinoffs;
+	float old_integrator_res[4];
+	float power[4];
+	float add[2];
+	float mul[4];
+
+	mean_ctx mean[4];
+
+	int oldbit;
+}modem_demodulator_ctx;
+
 typedef struct modem_ctx_
 {
 	int serial_pre_idle;
@@ -69,6 +94,8 @@ typedef struct modem_ctx_
 
 	unsigned int samples_generated_cnt;
 
+	modem_demodulator_ctx demodulators[4];
+
 }modem_ctx;
 
 void init_modem(modem_ctx *mdm);
@@ -76,3 +103,4 @@ int write_wave_file(char* filename,short * wavebuf,int size,int samplerate);
 int prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte);
 int FillWaveBuff(modem_ctx *mdm, int size,int offset);
 int BitStreamToWave(modem_ctx *mdm);
+void demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wavebuf,int samplescnt);
