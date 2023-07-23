@@ -57,6 +57,8 @@ typedef struct modem_demodulator_ctx_
 	mean_ctx mean[4];
 
 	int oldbit;
+	int bit_time;
+
 }modem_demodulator_ctx;
 
 typedef struct modem_ctx_
@@ -96,6 +98,12 @@ typedef struct modem_ctx_
 
 	modem_demodulator_ctx demodulators[4];
 
+	int serial_rx_delay;
+	int serial_rx_prev_state;
+	int serial_rx_state;
+	unsigned short serial_rx_shiftreg;
+	int serial_rx_parbitcnt;
+	int serial_rx_cnt;
 }modem_ctx;
 
 void init_modem(modem_ctx *mdm);

@@ -199,6 +199,91 @@ int prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte)
 	return tx_buffer_size;
 }
 
+int serial_rx(modem_ctx *mdm, int state)
+{
+	unsigned char mask;
+
+	if(mdm->serial_rx_delay)
+	{
+		mdm->serial_rx_delay--;
+		mdm->serial_rx_prev_state = state;
+		return 0;
+	}
+
+	switch(mdm->serial_rx_state)
+	{
+		case 0: // Wait start bit
+			if(!state && mdm->serial_rx_prev_state)
+			{
+				mdm->serial_rx_delay = mdm->bit_time + (mdm->bit_time/2);
+				mdm->serial_rx_shiftreg = 0x0000;
+				mdm->serial_rx_parbitcnt = 0;
+				mdm->serial_rx_cnt = 0;
+
+				mdm->serial_rx_state = 1;
+			}
+		break;
+		case 1: // Rx Shift
+			mask = 0x01;
+
+			if(state)
+			{
+				mdm->serial_rx_shiftreg |= (mask << mdm->serial_rx_cnt);
+				mdm->serial_rx_parbitcnt++;
+			}
+
+			mdm->serial_rx_cnt++;
+			if(mdm->serial_rx_cnt == mdm->serial_nbits)
+			{
+				mdm->serial_rx_state = 2;
+			}
+
+			mdm->serial_rx_delay = mdm->bit_time;
+		break;
+
+		case 2: // Parity
+			switch(mdm->serial_parity)
+			{
+				case 1: // odd
+					if( (mdm->serial_rx_parbitcnt & 1)  != (state&1) )
+					{
+						// bad parity
+#if 0
+						printf("Parity Error !\n");
+#endif
+					}
+				break;
+
+				case 2: // even
+					if( (mdm->serial_rx_parbitcnt & 1)  != ((state^1)&1) )
+					{
+						// bad parity
+#if 0
+						printf("Parity Error !\n");
+#endif
+					}
+				break;
+			}
+
+			mdm->serial_rx_state = 3;
+			mdm->serial_rx_delay = mdm->bit_time;
+		break;
+
+		case 3: // Stop bit
+			mdm->serial_rx_state = 0;
+			mdm->serial_rx_delay = 0;
+#if 0
+			printf("RX : 0x%.2X\n",mdm->serial_rx_shiftreg);
+#endif
+		break;
+	}
+
+	mdm->serial_rx_prev_state = state;
+
+	return 0;
+
+}
+
 int FillWaveBuff(modem_ctx *mdm, int size,int offset)
 {
 	int i;
@@ -381,15 +466,12 @@ void demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wavebuf,
 		if(result>=0)
 			bit = 1;
 
-		if( (bit != mdm_dmt->oldbit) && !bit )
-		{
-			// Start bit ?
-
-		}
+		serial_rx(mdm, bit);
 
 #if 0
 		printf("%f;%f;%f;%f;%f;%f;%f;%d\n",mdm_dmt->power[0],mdm_dmt->power[1],mdm_dmt->power[2],mdm_dmt->power[3],mdm_dmt->add[0],mdm_dmt->add[1],result,bit);
 #endif
+
 		mdm_dmt->oldbit = bit;
 
 		mdm_dmt->sinoffs++;
@@ -421,6 +503,7 @@ void init_modem(modem_ctx *mdm)
 		mdm->demodulators[0].freqs[0] = 2100;
 		mdm->demodulators[0].freqs[1] = 1300;
 		mdm->demodulators[0].sample_rate = DEFAULT_SAMPLERATE;
+		mdm->demodulators[0].bit_time = (mdm->sample_rate / mdm->baud_rate);
 
 		for(i=0;i<4;i++)
 		{
