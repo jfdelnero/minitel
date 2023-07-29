@@ -94,10 +94,11 @@ typedef struct videotex_ctx_
 #define ATTRIBUTS_XZOOM_SHIFT      0xE
 #define ATTRIBUTS_YZOOM_SHIFT      0xF
 
-videotex_ctx * init_videotex();
-int load_charset(videotex_ctx * ctx, char * file);
-void render_videotex(videotex_ctx * ctx);
-void select_palette(videotex_ctx * ctx, int palid);
-void push_char(videotex_ctx * ctx, unsigned char c);
+videotex_ctx * vdt_init();
 
-void deinit_videotex(videotex_ctx * ctx);
+int  vdt_load_charset(videotex_ctx * ctx, char * file);
+void vdt_render(videotex_ctx * ctx);
+void vdt_select_palette(videotex_ctx * ctx, int palid);
+void vdt_push_char(videotex_ctx * ctx, unsigned char c);
+
+void vdt_deinit(videotex_ctx * ctx);

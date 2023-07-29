@@ -58,6 +58,52 @@ videotex decoder.
 
 const unsigned char special_char[][4]=
 {
+	{ 0x02,   23, 0x41, 0x61 }, // à
+	{ 0x02,   25, 0x41, 0x65 }, // è
+	{ 0x02,    8, 0x41, 0x75 }, // ù
+	{ 0x02,   18, 0x42, 0x65 }, // é
+	{ 0x02,    1, 0x43, 0x61 }, // â
+	{ 0x02,   27, 0x43, 0x65 }, // ê
+	{ 0x01,   26, 0x6A, 0x00 }, // Œ
+	{ 0x02,   13, 0x43, 0x69 }, // î
+	{ 0x01,   12, 0x2C, 0x00 }, // ←
+	{ 0x01,    3, 0x23, 0x00 }, // £
+	{ 0x01,   14, 0x2E, 0x00 }, // →
+	{ 0x01,   15, 0x2F, 0x00 }, // ↓
+	{ 0x01,   16, 0x30, 0x00 }, // °
+	{ 0x01,   17, 0x31, 0x00 }, // ±
+	{ 0x02,   31, 0x43, 0x6F }, // ô
+	{ 0x02,   22, 0x43, 0x75 }, // û
+	{ 0x02,   19, 0x48, 0x65 }, // ë
+	{ 0x02,   20, 0x48, 0x69 }, // ï
+	{ 0x02,   21, 0x4B, 0x63 }, // ç
+	{ 0x01,   26, 0x7A, 0x00 }, // œ
+	{ 0x01,   28, 0x3C, 0x00 }, // ¼
+	{ 0x01,   29, 0x3D, 0x00 }, // ½
+	{ 0x01,   30, 0x3E, 0x00 }, // ¾
+	{ 0x01,   94, 0x2D, 0x00 }, // ↑
+
+	{ 0x02,   97, 0x42, 0x61 }, //  á
+	{ 0x02,   97, 0x48, 0x61 }, //  ä
+	{ 0x02,  105, 0x41, 0x69 }, //  ì
+	{ 0x02,  105, 0x42, 0x69 }, //  í
+	{ 0x02,  111, 0x41, 0x6F }, //  ò
+	{ 0x02,  111, 0x42, 0x6F }, //  ó
+	{ 0x02,  111, 0x48, 0x6F }, //  ö
+	{ 0x02,  117, 0x42, 0x75 }, //  ú
+	{ 0x02,  117, 0x48, 0x75 }, //  ü
+
+	{ 0x01,   31, 0x7B, 0x00 }, //  ß
+	{ 0x01,   31, 0x7B, 0x00 }, //  β
+
+	{ 0x01,   '$', '$', 0x00 }, //  $
+
+	{ 0x00, 0x00, 0x00, 0x00 }
+};
+
+/*
+const unsigned char special_char[][4]=
+{
 	{ 0x02,    0, 0x41, 0x61 }, // à
 	{ 0x02,    1, 0x41, 0x65 }, // è
 	{ 0x02,    2, 0x41, 0x75 }, // ù
@@ -100,8 +146,9 @@ const unsigned char special_char[][4]=
 
 	{ 0x00, 0x00, 0x00, 0x00 }
 };
+*/
 
-int find_special_char(videotex_ctx * ctx,unsigned char * code, int size,unsigned char * charcode)
+static int vdt_find_special_char(videotex_ctx * ctx,unsigned char * code, int size,unsigned char * charcode)
 {
 	int i,j;
 	unsigned char * ptr;
@@ -137,31 +184,31 @@ int find_special_char(videotex_ctx * ctx,unsigned char * code, int size,unsigned
 	return 0;
 }
 
-unsigned int set_mask(unsigned int reg, int shift, unsigned int mask, unsigned int val)
+static unsigned int vdt_set_mask(unsigned int reg, int shift, unsigned int mask, unsigned int val)
 {
 	return ( ( reg & ~(mask << shift) ) | ((val & mask) << shift) );
 }
 
-unsigned int get_mask(unsigned int reg, int shift, unsigned int mask)
+static unsigned int vdt_get_mask(unsigned int reg, int shift, unsigned int mask)
 {
 	return ( (reg >> shift) & mask);
 }
 
-void resetstate(videotex_ctx * ctx)
+static void vdt_resetstate(videotex_ctx * ctx)
 {
-	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FOREGROUND_C0LOR_SHIFT, ATTRIBUTS_FOREGROUND_C0LOR_MASK, 7);
-	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_BACKGROUND_C0LOR_SHIFT, ATTRIBUTS_BACKGROUND_C0LOR_MASK, 0);
-	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x0);
-	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x0);
-	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x0);
-	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x0);
-	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_BLINK_SHIFT, 0x1, 0x0);
-	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
-	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_MASK_SHIFT, 0x1, 0x0);
+	ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_FOREGROUND_C0LOR_SHIFT, ATTRIBUTS_FOREGROUND_C0LOR_MASK, 7);
+	ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_BACKGROUND_C0LOR_SHIFT, ATTRIBUTS_BACKGROUND_C0LOR_MASK, 0);
+	ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x0);
+	ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x0);
+	ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x0);
+	ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x0);
+	ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_BLINK_SHIFT, 0x1, 0x0);
+	ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
+	ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_MASK_SHIFT, 0x1, 0x0);
 	ctx->underline_latch = 0;
 }
 
-void select_palette(videotex_ctx * ctx, int pal_id)
+void vdt_select_palette(videotex_ctx * ctx, int pal_id)
 {
 	int i;
 
@@ -193,7 +240,7 @@ void select_palette(videotex_ctx * ctx, int pal_id)
 	}
 }
 
-int set_cursor(videotex_ctx * ctx,unsigned mask,int x,int y)
+static int vdt_set_cursor(videotex_ctx * ctx,unsigned mask,int x,int y)
 {
 	if(mask&1)
 		ctx->cursor_x_pos = x;
@@ -204,7 +251,7 @@ int set_cursor(videotex_ctx * ctx,unsigned mask,int x,int y)
 	return 0;
 }
 
-videotex_ctx * init_videotex()
+videotex_ctx * vdt_init()
 {
 	videotex_ctx * ctx;
 
@@ -246,15 +293,15 @@ videotex_ctx * init_videotex()
 
 		memset(ctx->bmp_buffer,0x29,ctx->bmp_res_x * ctx->bmp_res_y * sizeof(uint32_t) );
 
-		select_palette(ctx, 1);
+		vdt_select_palette(ctx, 1);
 
-		resetstate(ctx);
+		vdt_resetstate(ctx);
 
-		set_cursor(ctx,3,38,0);
-		ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x1);
-		push_char(ctx, 'C');
-		ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x0);
-		set_cursor(ctx,3,0,1);
+		vdt_set_cursor(ctx,3,38,0);
+		ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x1);
+		vdt_push_char(ctx, 'C');
+		ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x0);
+		vdt_set_cursor(ctx,3,0,1);
 
 		ctx->last_char = ' ';
 	}
@@ -282,7 +329,7 @@ error:
 	return NULL;
 }
 
-int getpixstate(unsigned char * buf, int xpos, int ypos, int xsize, int ysize,int msbfirst)
+static int vdt_getpixstate(unsigned char * buf, int xpos, int ypos, int xsize, int ysize,int msbfirst)
 {
 	int biti;
 
@@ -309,7 +356,7 @@ int getpixstate(unsigned char * buf, int xpos, int ypos, int xsize, int ysize,in
 	return 0;
 }
 
-void set_char_pix(unsigned char * buf,int x,int y,int xsize,int ysize, int state)
+static void vdt_set_char_pix(unsigned char * buf,int x,int y,int xsize,int ysize, int state)
 {
 	int bitoffset;
 
@@ -324,7 +371,7 @@ void set_char_pix(unsigned char * buf,int x,int y,int xsize,int ysize, int state
 	}
 }
 
-void copy_char(unsigned char *dest_buf,unsigned char *src_buf,unsigned int src_x_size, unsigned int src_y_size, unsigned int src_x_pos, unsigned int src_y_pos, unsigned int char_x_size, unsigned int char_y_size, int msbfirst)
+static void vdt_copy_char(unsigned char *dest_buf,unsigned char *src_buf,unsigned int src_x_size, unsigned int src_y_size, unsigned int src_x_pos, unsigned int src_y_pos, unsigned int char_x_size, unsigned int char_y_size, int msbfirst)
 {
 	unsigned int x, y;
 
@@ -332,20 +379,20 @@ void copy_char(unsigned char *dest_buf,unsigned char *src_buf,unsigned int src_x
 	{
 		for(x=0;x<char_x_size;x++)
 		{
-			if(getpixstate(src_buf, src_x_pos + x, src_y_pos + y, src_x_size, src_y_size,msbfirst))
+			if(vdt_getpixstate(src_buf, src_x_pos + x, src_y_pos + y, src_x_size, src_y_size,msbfirst))
 			{
-				set_char_pix(dest_buf, x, y, char_x_size, char_y_size, 1);
+				vdt_set_char_pix(dest_buf, x, y, char_x_size, char_y_size, 1);
 			}
 			else
 			{
-				set_char_pix(dest_buf, x, y, char_x_size, char_y_size, 0);
+				vdt_set_char_pix(dest_buf, x, y, char_x_size, char_y_size, 0);
 			}
 		}
 	}
 }
 
 
-int load_charset(videotex_ctx * ctx, char * file)
+int vdt_load_charset(videotex_ctx * ctx, char * file)
 {
 	FILE * f;
 	unsigned char * charsettmp;
@@ -400,21 +447,21 @@ int load_charset(videotex_ctx * ctx, char * file)
 				j = 0;
 				for(i=0;i<64;i++)
 				{
-					copy_char( &ctx->charset[((8*16)*(i+'@'))/8] ,(unsigned char*)font_teletel,8, 2048, 0, (i * 32) + (j*10), 8, 10, 1 );
+					vdt_copy_char( &ctx->charset[((8*16)*(i+'@'))/8] ,(unsigned char*)font_teletel,8, 2048, 0, (i * 32) + (j*10), 8, 10, 1 );
 					l++;
 				}
 
 				j = 1;
 				for(i=0;i<64;i++)
 				{
-					copy_char( &ctx->charset[((8*16)*(i))/8] ,(unsigned char*)font_teletel,8, 2048, 0, (i * 32) + (j*10), 8, 10, 1 );
+					vdt_copy_char( &ctx->charset[((8*16)*(i))/8] ,(unsigned char*)font_teletel,8, 2048, 0, (i * 32) + (j*10), 8, 10, 1 );
 					l++;
 				}
 
 				j = 2;
 				for(i=0;i<64;i++)
 				{
-					copy_char( &ctx->charset[((8*16)*(i+128))/8] ,(unsigned char*)font_teletel,8, 2048, 0, (i * 32) + (j*10), 8, 10, 1 );
+					vdt_copy_char( &ctx->charset[((8*16)*(i+128))/8] ,(unsigned char*)font_teletel,8, 2048, 0, (i * 32) + (j*10), 8, 10, 1 );
 					l++;
 				}
 			}
@@ -427,25 +474,25 @@ int load_charset(videotex_ctx * ctx, char * file)
 				for(i=0;i<64;i++)
 				{
 					l = 192 + i;
-					copy_char( &ctx->charset[((8*16)*(i+'@'))/8] ,(unsigned char*)font_ef9345,32, 2048, (l&3) * 8, (l >> 2) * 16, 8, 10, 0 );
+					vdt_copy_char( &ctx->charset[((8*16)*(i+'@'))/8] ,(unsigned char*)font_ef9345,32, 2048, (l&3) * 8, (l >> 2) * 16, 8, 10, 0 );
 				}
 
 				for(i=0;i<64;i++)
 				{
 					l = i;
-					copy_char( &ctx->charset[((8*16)*(i))/8] ,    (unsigned char*)font_ef9345,32, 2048, (l&3) * 8, (l >> 2) * 16, 8, 10, 0 );
+					vdt_copy_char( &ctx->charset[((8*16)*(i))/8] ,    (unsigned char*)font_ef9345,32, 2048, (l&3) * 8, (l >> 2) * 16, 8, 10, 0 );
 				}
 
 				for(i=0;i<64;i++)
 				{
 					l = 256 + i;
-					copy_char( &ctx->charset[((8*16)*(i+128))/8] ,(unsigned char*)font_ef9345,32, 2048, (l&3) * 8, (l >> 2) * 16, 8, 10, 0 );
+					vdt_copy_char( &ctx->charset[((8*16)*(i+128))/8] ,(unsigned char*)font_ef9345,32, 2048, (l&3) * 8, (l >> 2) * 16, 8, 10, 0 );
 				}
 
 				for(i=0;i<64;i++)
 				{
 					l = 320 + i;
-					copy_char( &ctx->charset[((8*16)*(i+128))/8] ,(unsigned char*)font_ef9345,32, 2048, (l&3) * 8, (l >> 2) * 16, 8, 10, 0 );
+					vdt_copy_char( &ctx->charset[((8*16)*(i+128))/8] ,(unsigned char*)font_ef9345,32, 2048, (l&3) * 8, (l >> 2) * 16, 8, 10, 0 );
 				}
 			}
 
@@ -495,7 +542,7 @@ static unsigned char char_mask[][10]=
 // Can't have a double height character in the first line
 // Can't have a double width character in the last row.
 
-uint32_t draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,uint32_t attributs,uint32_t prevrow_attributs,uint32_t prev_attributs)
+static uint32_t vdt_draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,uint32_t attributs,uint32_t prevrow_attributs,uint32_t prev_attributs)
 {
 	int i,j,pix,pix_mask,pix_underline,invert;
 	int rom_base,rom_bit_offset,mask_bit_offset;
@@ -513,12 +560,12 @@ uint32_t draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,uint32_t att
 	mask = (unsigned char*)&char_mask[0];
 	under_line_mask = (unsigned char*)&char_mask[0];
 
-	switch(get_mask(attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK))
+	switch(vdt_get_mask(attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK))
 	{
 		case 0:
 			rom_base = ((ctx->char_res_x_size * 16) * (int)c);
 
-			if(get_mask(attributs, ATTRIBUTS_UNDERLINE_SHIFT, 1))
+			if(vdt_get_mask(attributs, ATTRIBUTS_UNDERLINE_SHIFT, 1))
 				under_line_mask = (unsigned char*)&char_mask[2];
 
 		break;
@@ -532,7 +579,7 @@ uint32_t draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,uint32_t att
 
 			rom_base = ((ctx->char_res_x_size * 16) * (int)c);
 
-			if(get_mask(attributs, ATTRIBUTS_UNDERLINE_SHIFT, 1))
+			if(vdt_get_mask(attributs, ATTRIBUTS_UNDERLINE_SHIFT, 1))
 				mask = (unsigned char*)&char_mask[1];
 
 		break;
@@ -542,10 +589,10 @@ uint32_t draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,uint32_t att
 		break;
 	}
 
-	xfactor = get_mask(attributs, ATTRIBUTS_XZOOM_SHIFT, 1) + 1;
-	yfactor = get_mask(attributs, ATTRIBUTS_YZOOM_SHIFT, 1) + 1;
-	invert = get_mask(attributs, ATTRIBUTS_INVERT_SHIFT, 1);
-	blink = get_mask(attributs, ATTRIBUTS_BLINK_SHIFT, 1);
+	xfactor = vdt_get_mask(attributs, ATTRIBUTS_XZOOM_SHIFT, 1) + 1;
+	yfactor = vdt_get_mask(attributs, ATTRIBUTS_YZOOM_SHIFT, 1) + 1;
+	invert = vdt_get_mask(attributs, ATTRIBUTS_INVERT_SHIFT, 1);
+	blink = vdt_get_mask(attributs, ATTRIBUTS_BLINK_SHIFT, 1);
 
 	row_left = ctx->char_res_y_size;
 	row_offset = 0;
@@ -635,7 +682,7 @@ uint32_t draw_char(videotex_ctx * ctx,int x, int y, unsigned char c,uint32_t att
 	return (attributs & 0xFFFFFF) | ((col_left&0xF) << 28) | ((row_left&0xF) << 24);
 }
 
-void render_videotex(videotex_ctx * ctx)
+void vdt_render(videotex_ctx * ctx)
 {
 	int x,y,charindex;
 	uint32_t prev_attributs;
@@ -650,7 +697,7 @@ void render_videotex(videotex_ctx * ctx)
 		{
 			charindex = (y*ctx->char_res_x) + x;
 
-			prev_attributs = draw_char(ctx, x*ctx->char_res_x_size, y*ctx->char_res_y_size, ctx->char_buffer[charindex], ctx->attribut_buffer[charindex], ctx->prev_raw_attributs[x],prev_attributs);
+			prev_attributs = vdt_draw_char(ctx, x*ctx->char_res_x_size, y*ctx->char_res_y_size, ctx->char_buffer[charindex], ctx->attribut_buffer[charindex], ctx->prev_raw_attributs[x],prev_attributs);
 
 			ctx->prev_raw_attributs[x] = prev_attributs;
 
@@ -668,7 +715,7 @@ void render_videotex(videotex_ctx * ctx)
 	}
 }
 
-int move_cursor(videotex_ctx * ctx,int x,int y)
+static int vdt_move_cursor(videotex_ctx * ctx,int x,int y)
 {
 	ctx->cursor_x_pos += x;
 	if(ctx->cursor_x_pos < 0)
@@ -701,7 +748,7 @@ int move_cursor(videotex_ctx * ctx,int x,int y)
 	return 0;
 }
 
-int push_cursor(videotex_ctx * ctx,int cnt)
+static int vdt_push_cursor(videotex_ctx * ctx,int cnt)
 {
 	 ctx->cursor_x_pos += cnt;
 
@@ -710,10 +757,10 @@ int push_cursor(videotex_ctx * ctx,int cnt)
 		ctx->cursor_x_pos %= ctx->char_res_x;
 		ctx->cursor_y_pos++;
 
-		if( get_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1) )
+		if( vdt_get_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1) )
 			ctx->cursor_y_pos++;
 
-		ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
+		ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
 		ctx->underline_latch = 0;
 
 		if(ctx->cursor_y_pos>=ctx->char_res_y)
@@ -726,7 +773,7 @@ int push_cursor(videotex_ctx * ctx,int cnt)
 	return 0;
 }
 
-void print_char(videotex_ctx * ctx,unsigned char c)
+static void vdt_print_char(videotex_ctx * ctx,unsigned char c)
 {
 	int xsize,ysize,x,y;
 	int charindex;
@@ -736,10 +783,10 @@ void print_char(videotex_ctx * ctx,unsigned char c)
 	xsize = 1;
 	ysize = 1;
 
-	if( ( ctx->cursor_x_pos < ctx->char_res_x - 1 ) && get_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1) )
+	if( ( ctx->cursor_x_pos < ctx->char_res_x - 1 ) && vdt_get_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1) )
 		xsize = 2;
 
-	if( ctx->cursor_y_pos && get_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1) )
+	if( ctx->cursor_y_pos && vdt_get_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1) )
 		ysize = 2;
 
 	for(x=0;x<xsize;x++)
@@ -783,51 +830,51 @@ void print_char(videotex_ctx * ctx,unsigned char c)
 			}
 		}
 
-		push_cursor(ctx,1);
+		vdt_push_cursor(ctx,1);
 	}
 }
 
-int fill_line(videotex_ctx * ctx, unsigned char c)
+static int vdt_fill_line(videotex_ctx * ctx, unsigned char c)
 {
 	int tmp_x;
 
 	while( ctx->cursor_x_pos < ctx->char_res_x - 1 )
 	{
 		tmp_x = ctx->cursor_x_pos;
-		print_char(ctx,c);
+		vdt_print_char(ctx,c);
 		if( ctx->cursor_x_pos <= tmp_x )
 		{
 			return 0;
 		}
 	};
 
-	print_char(ctx,c);
+	vdt_print_char(ctx,c);
 
 	return 0;
 }
 
-void clear_page(videotex_ctx * ctx)
+static void vdt_clear_page(videotex_ctx * ctx)
 {
 	int i;
 	uint32_t attributs;
 
-	set_cursor(ctx,3,0,1);
+	vdt_set_cursor(ctx,3,0,1);
 	for(i=0;i<(ctx->char_res_x*ctx->char_res_y);i++)
 	{
-		print_char(ctx,' ');
+		vdt_print_char(ctx,' ');
 	}
 
-	set_cursor(ctx,3,38,0);
+	vdt_set_cursor(ctx,3,38,0);
 
 	attributs = ctx->current_attributs;
-	set_cursor(ctx,3,38,0);
-	ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x1);
-	push_char(ctx, 'C');
+	vdt_set_cursor(ctx,3,38,0);
+	ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x1);
+	vdt_push_char(ctx, 'C');
 	ctx->current_attributs = attributs;
-	set_cursor(ctx,3,0,1);
+	vdt_set_cursor(ctx,3,0,1);
 }
 
-unsigned char convert_pos(videotex_ctx * ctx,unsigned char x,unsigned char y,int ret)
+static unsigned char vdt_convert_pos(videotex_ctx * ctx,unsigned char x,unsigned char y,int ret)
 {
 	unsigned char x_pos,y_pos;
 
@@ -850,10 +897,11 @@ unsigned char convert_pos(videotex_ctx * ctx,unsigned char x,unsigned char y,int
 		return x_pos;
 }
 
-void push_char(videotex_ctx * ctx, unsigned char c)
+void vdt_push_char(videotex_ctx * ctx, unsigned char c)
 {
 	unsigned int i,tmp;
 	unsigned char tmp_char;
+	uint32_t next_decoder_state;
 
 	ctx->input_bytes_cnt++;
 
@@ -863,11 +911,11 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 
 			if( (c>=0x20) && (c<=0x7F) )
 			{
-				print_char(ctx,c);
+				vdt_print_char(ctx,c);
 
 				if(c == ' ' && ctx->underline_latch )
 				{
-					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x1);
+					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x1);
 					ctx->underline_latch = 0;
 				}
 			}
@@ -888,40 +936,40 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 						LOG("Dring\n");
 					break;
 					case 0x08:
-						move_cursor(ctx,-1,0);
+						vdt_move_cursor(ctx,-1,0);
 						LOG("Left (New pos : x:%d y:%d)\n",ctx->cursor_x_pos,ctx->cursor_y_pos);
 					break;
 					case 0x09:
-						move_cursor(ctx,1,0);
+						vdt_move_cursor(ctx,1,0);
 						LOG("Right (New pos : x:%d y:%d)\n",ctx->cursor_x_pos,ctx->cursor_y_pos);
 					break;
 					case 0x0A:
-						move_cursor(ctx,0,1);
+						vdt_move_cursor(ctx,0,1);
 						LOG("Down (New pos : x:%d y:%d)\n",ctx->cursor_x_pos,ctx->cursor_y_pos);
 					break;
 					case 0x0B:
-						move_cursor(ctx,0,-1);
+						vdt_move_cursor(ctx,0,-1);
 						LOG("Up (New pos : x:%d y:%d)\n",ctx->cursor_x_pos,ctx->cursor_y_pos);
 					break;
 					case 0x0C:
 						LOG("Page Clear\n");
-						clear_page(ctx);
-						resetstate(ctx);
+						vdt_clear_page(ctx);
+						vdt_resetstate(ctx);
 					break;
 					case 0x0D:
-						set_cursor(ctx,1,0,0);
+						vdt_set_cursor(ctx,1,0,0);
 						LOG("Retour chariot (New pos : x:%d y:%d)\n",ctx->cursor_x_pos,ctx->cursor_y_pos);
 					break;
 					case 0x0E:
 						LOG("G1\n");
-						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x1);
-						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
+						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x1);
+						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
 						ctx->underline_latch = 0;
 					break;
 					case 0x0F:
 						LOG("G0\n");
-						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x0);
-						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
+						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x0);
+						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
 						ctx->underline_latch = 0;
 					break;
 					case 0x11:
@@ -943,17 +991,17 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 					break;
 					case 0x18:
 						tmp = ctx->current_attributs;
-						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x0);
-						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
+						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x0);
+						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
 						ctx->underline_latch = 0;
 						LOG("Clear end off line\n");
-						fill_line(ctx, ' ');
+						vdt_fill_line(ctx, ' ');
 						ctx->current_attributs = tmp;
 					break;
 					case 0x19:
 						LOG("G2\n");
-						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x2);
-						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
+						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x2);
+						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
 						ctx->underline_latch = 0;
 					break;
 					case 0x1A:
@@ -963,8 +1011,8 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 						ctx->decoder_state = 0x1B;
 					break;
 					case 0x1E:
-						set_cursor(ctx,3,0,1);
-						resetstate(ctx);
+						vdt_set_cursor(ctx,3,0,1);
+						vdt_resetstate(ctx);
 						LOG("Home (New pos : x:%d y:%d)\n",ctx->cursor_x_pos,ctx->cursor_y_pos);
 					break;
 					case 0x1F:
@@ -984,7 +1032,7 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 			 LOG("Repeat %d times '%C'/0x%.2X\n",(c - 0x40),ctx->last_char,ctx->last_char);
 			 while(i<(unsigned char)(c - 0x40))
 			 {
-				print_char(ctx,ctx->last_char);
+				vdt_print_char(ctx,ctx->last_char);
 				i++;
 			 }
 			 ctx->decoder_state = 0x00;
@@ -1002,11 +1050,11 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 
 			LOG("Special char 0x%.2X\n",c);
 
-			if( find_special_char(ctx,(unsigned char*)&ctx->decoder_buffer[1], ctx->decoder_step,&tmp_char) )
+			if( vdt_find_special_char(ctx,(unsigned char*)&ctx->decoder_buffer[1], ctx->decoder_step,&tmp_char) )
 			{
 				tmp = ctx->current_attributs;
-				ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x2);
-				print_char(ctx,tmp_char);
+				ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x2);
+				vdt_print_char(ctx,tmp_char);
 				ctx->current_attributs = tmp;
 
 				ctx->decoder_state = 0x00;
@@ -1020,7 +1068,6 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 		break;
 
 		case 0x1B:
-			uint32_t next_decoder_state;
 
 			next_decoder_state = 0x00;
 
@@ -1030,12 +1077,12 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 			{
 				case 0x48:
 					LOG("Clignotement\n");
-					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_BLINK_SHIFT, 0x1, 0x1);
+					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_BLINK_SHIFT, 0x1, 0x1);
 				break;
 
 				case 0x49:
 					LOG("Fixe\n");
-					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_BLINK_SHIFT, 0x1, 0x0);
+					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_BLINK_SHIFT, 0x1, 0x0);
 				break;
 
 				case 0x4A:
@@ -1048,64 +1095,64 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 
 				case 0x4C:
 					LOG("Taille normale\n");
-					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x0);
-					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x0);
+					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x0);
+					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x0);
 				break;
 
 				case 0x4D:
 					LOG("Double hauteur\n");
-					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x0);
+					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x0);
 					if(ctx->cursor_y_pos>1)
-						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x1);
+						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x1);
 				break;
 
 				case 0x4E:
 					LOG("Double largeur\n");
-					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x1);
-					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x0);
+					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x1);
+					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x0);
 				break;
 
 				case 0x4F:
 					LOG("Double hauteur et double largeur\n");
 					if(ctx->cursor_y_pos>1)
 					{
-						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x1);
-						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x1);
+						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_XZOOM_SHIFT, 0x1, 0x1);
+						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_YZOOM_SHIFT, 0x1, 0x1);
 					}
 				break;
 
 				case 0x58:
 					LOG("Masquage\n");
-					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_MASK_SHIFT, 0x1, 0x1);
+					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_MASK_SHIFT, 0x1, 0x1);
 				break;
 
 				case 0x59:
 					LOG("Fin de lignage\n");
-					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
+					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
 					ctx->underline_latch = 0;
 				break;
 
 				case 0x5A:
 					LOG("Début de lignage\n");
-					if(get_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK) == 0)
+					if(vdt_get_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK) == 0)
 					{
 						ctx->underline_latch = 1;
 					}
 					else
 					{
-						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x1);
+						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x1);
 						ctx->underline_latch = 0;
 					}
 				break;
 
 				case 0x5C:
 					LOG("Fond normal\n");
-					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x0);
+					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x0);
 				break;
 
 				case 0x5D:
 					LOG("Inversion de fond\n");
-					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x1);
+					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_INVERT_SHIFT, 0x1, 0x1);
 				break;
 
 				case 0x5E:
@@ -1114,7 +1161,7 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 
 				case 0x5F:
 					LOG("Démasquage\n");
-					ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_MASK_SHIFT, 0x1, 0x0);
+					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_MASK_SHIFT, 0x1, 0x0);
 				break;
 
 				case 0x61:
@@ -1132,7 +1179,7 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 					{
 						LOG("Set char color (%x)\n",c);
 						ctx->decoder_state = 0x00;
-						ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_FOREGROUND_C0LOR_SHIFT, ATTRIBUTS_FOREGROUND_C0LOR_MASK, c);
+						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_FOREGROUND_C0LOR_SHIFT, ATTRIBUTS_FOREGROUND_C0LOR_MASK, c);
 					}
 					else
 					{
@@ -1140,11 +1187,11 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 						{
 							LOG("Set background color (%x)\n",c);
 							ctx->decoder_state = 0x00;
-							ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_BACKGROUND_C0LOR_SHIFT, ATTRIBUTS_BACKGROUND_C0LOR_MASK, c);
+							ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_BACKGROUND_C0LOR_SHIFT, ATTRIBUTS_BACKGROUND_C0LOR_MASK, c);
 
-							if( get_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1) && get_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK) == 0 )
+							if( vdt_get_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1) && vdt_get_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK) == 0 )
 							{
-								ctx->current_attributs = set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
+								ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
 								ctx->underline_latch = 1;
 							}
 						}
@@ -1163,12 +1210,12 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 			ctx->decoder_buffer[ctx->decoder_step] = c;
 			if(ctx->decoder_step >= 2)
 			{
-				set_cursor(ctx,0x3,convert_pos(ctx,ctx->decoder_buffer[2],ctx->decoder_buffer[1],0),convert_pos(ctx,ctx->decoder_buffer[2],ctx->decoder_buffer[1],1));
+				vdt_set_cursor(ctx,0x3,vdt_convert_pos(ctx,ctx->decoder_buffer[2],ctx->decoder_buffer[1],0),vdt_convert_pos(ctx,ctx->decoder_buffer[2],ctx->decoder_buffer[1],1));
 
 				LOG("(New pos : x:%d y:%d)\n",ctx->cursor_x_pos,ctx->cursor_y_pos);
 
 				ctx->decoder_state = 0x00;
-				resetstate(ctx);
+				vdt_resetstate(ctx);
 			}
 		break;
 		case 0x70:
@@ -1210,7 +1257,7 @@ void push_char(videotex_ctx * ctx, unsigned char c)
 	}
 }
 
-void deinit_videotex(videotex_ctx * ctx)
+void vdt_deinit(videotex_ctx * ctx)
 {
 	if(ctx)
 	{
