@@ -43,17 +43,110 @@ Available command line options :
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #include <math.h>
+
+#ifdef SDL_SUPPORT
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_audio.h>
+#endif
+
+#ifdef EMSCRIPTEN_SUPPORT
+#include <emscripten.h>
+#endif
 
 #include "cache.h"
 #include "videotex.h"
 #include "bmp_file.h"
 #include "modem.h"
 
+#include "FIR/FIR_V22_Minitel.h"
+
+#include "vdt2bmp.h"
+
 #define DEFAULT_SOUND_FILE "out_audio.wav"
 
-int verbose;
+#ifdef SDL_SUPPORT
+
+//////////////////////////////////////////////////////////////////
+// Audio callbacks
+//////////////////////////////////////////////////////////////////
+
+void audio_out(void *ctx, Uint8 *stream, int len)
+{
+	modem_ctx *mdm;
+
+	mdm = ((app_ctx *)ctx)->mdm;
+
+	mdm_genWave(mdm, (short*)stream, len/2);
+
+	mdm_demodulate(mdm, &mdm->demodulators[0],(short *)stream, len/2);
+}
+
+void audio_in(void *ctx, Uint8 *stream, int len)
+{
+	int i;
+	modem_ctx *mdm;
+	short * buf;
+
+	mdm = ((app_ctx *)ctx)->mdm;
+
+	if(((app_ctx *)ctx)->fir_en)
+	{
+		buf = (short *)stream;
+		for(i=0;i<len/2;i++)
+		{
+			FIR_2100_1300_22050_Filter_put(&((app_ctx *)ctx)->fir, buf[i]);
+			buf[i] = FIR_2100_1300_22050_Filter_get(&((app_ctx *)ctx)->fir);
+		}
+	}
+
+	mdm_demodulate(mdm, &mdm->demodulators[0],(short *)stream, len/2);
+
+}
+
+Uint32 video_tick(Uint32 interval, void *param)
+{
+	uint8_t * pixels;
+	bitmap_data bmp;
+	videotex_ctx * vdt_ctx;
+	modem_ctx *mdm;
+	SDL_Surface *sdl_scr;
+	SDL_Event e;
+	int i;
+
+	mdm = ((app_ctx *)param)->mdm;
+	vdt_ctx = ((app_ctx *)param)->vdt_ctx;
+	sdl_scr = ((app_ctx *)param)->screen;
+
+	update_frame(vdt_ctx,mdm, &bmp);
+
+	if (SDL_MUSTLOCK(sdl_scr))
+		SDL_LockSurface(sdl_scr);
+
+	pixels = sdl_scr->pixels;
+
+	for(i=0;i<(bmp.xsize * bmp.ysize);i++)
+	{
+		pixels[(i*4)+2] = bmp.data[i] & 0xFF;
+		pixels[(i*4)+1] = (bmp.data[i]>>8) & 0xFF;
+		pixels[(i*4)+0] = (bmp.data[i]>>16) & 0xFF;
+	}
+
+	if (SDL_MUSTLOCK(sdl_scr))
+		SDL_UnlockSurface(sdl_scr);
+
+	SDL_UpdateWindowSurface(((app_ctx *)param)->window);
+
+    SDL_PollEvent(&e);
+    if (e.type == SDL_QUIT)
+		((app_ctx *)param)->quit = 1;
+
+	return interval;
+}
+
+#endif
 
 int isOption(int argc, char* argv[],char * paramtosearch,char * argtoparam)
 {
@@ -123,28 +216,75 @@ void printhelp(char* argv[])
 	fprintf(stderr,"Options:\n");
 	fprintf(stderr,"  -bmp[:out_file.bmp] \t\t: generate bmp file(s)\n");
 	fprintf(stderr,"  -ani\t\t\t\t: generate animation\n");
+	fprintf(stderr,"  -sdl\t\t\t\t: SDL mode\n");
+	fprintf(stderr,"  -mic\t\t\t\t: Use the Microphone/Input line instead of files\n");
 	fprintf(stderr,"  -stdout \t\t\t: stdout mode\n");
 	fprintf(stderr,"  -help \t\t\t: This help\n");
 	fprintf(stderr,"  \nExamples :\n");
 	fprintf(stderr,"  animation: vdt2bmp -ani -fps:30 -stdout /path/*.vdt | ffmpeg -y -f rawvideo -pix_fmt argb -s 320x250 -r 30 -i - -an out_video.mkv\n");
-	fprintf(stderr,"  video + audio merging : ffmpeg -i out_video.mkv -i out_audio.wav -c copy output.mkv\n");	
+	fprintf(stderr,"  video + audio merging : ffmpeg -i out_video.mkv -i out_audio.wav -c copy output.mkv\n");
 	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp /path/*.vdt\n");
 	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp:out.bmp /path/videotex.vdt\n");
 	fprintf(stderr,"\n");
 }
 
-int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framerate, int nb_pause_frames, int stdout_mode)
+int update_frame(videotex_ctx * vdt_ctx,modem_ctx *mdm, bitmap_data * bmp)
+{
+	unsigned char byte;
+
+	while(mdm_pop_from_fifo(&mdm->rx_fifo, &byte))
+	{
+		vdt_push_char( vdt_ctx, byte );
+	}
+
+	bmp->xsize = vdt_ctx->bmp_res_x;
+	bmp->ysize = vdt_ctx->bmp_res_y;
+	bmp->data = vdt_ctx->bmp_buffer;
+
+	vdt_render(vdt_ctx);
+
+	return 0;
+}
+
+int gen_stdout_frame(videotex_ctx * vdt_ctx, modem_ctx *mdm,unsigned char * tmp_buf)
+{
+	bitmap_data bmp;
+	int i,size;
+
+	update_frame(vdt_ctx,mdm, &bmp);
+
+	for(i=0;i<(bmp.xsize * bmp.ysize);i++)
+	{
+		tmp_buf[(i*4)+1] = bmp.data[i] & 0xFF;
+		tmp_buf[(i*4)+2] = (bmp.data[i]>>8) & 0xFF;
+		tmp_buf[(i*4)+3] = (bmp.data[i]>>16) & 0xFF;
+	}
+	fwrite(tmp_buf, bmp.xsize * bmp.ysize * 4, 1, stdout);
+
+	size = mdm->sample_rate / vdt_ctx->framerate;
+	if(size > 0 && size < mdm->wave_size)
+	{
+		mdm_genWave(mdm, NULL,  size );
+		mdm_demodulate(mdm, &mdm->demodulators[0],(short *)mdm->wave_buf, size);
+	}
+
+	write_wave_file(DEFAULT_SOUND_FILE,mdm->wave_buf,size,mdm->sample_rate);
+
+	return 0;
+}
+
+int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framerate, int nb_pause_frames, int out_mode, int * quit)
 {
 	char ofilename[512];
-	int offset,i,totalsndsmp,next_pic_sndsmp,totalneededsamples;
+	int offset,i,pause_frames_cnt;
 	bitmap_data bmp;
-	int image_nb,pause_frames_cnt;
+	int image_nb;
 	file_cache fc;
 	unsigned char * tmp_buf;
-	image_nb = 0;
+	unsigned char c;
 
+	image_nb = 0;
 	pause_frames_cnt = 0;
-	next_pic_sndsmp = 0;
 
 	fprintf(stderr,"Generate animation from %s...\n",vdtfile);
 
@@ -153,7 +293,7 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framera
 
 	if(open_file(&fc, vdtfile,0xFF)>=0)
 	{
-		if(stdout_mode)
+		if(out_mode != OUTPUT_MODE_FILE)
 		{
 			tmp_buf = malloc(vdt_ctx->bmp_res_x * vdt_ctx->bmp_res_y * 4);
 			if(!tmp_buf)
@@ -162,90 +302,75 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framera
 			memset(tmp_buf,0,vdt_ctx->bmp_res_x * vdt_ctx->bmp_res_y * 4);
 		}
 
-		vdt_ctx->pages_cnt++;
-
-		mdm->next_bitlimit = mdm->bit_time;
-		mdm->sample_offset = 0;
-
-		totalsndsmp = 0;
-		offset = 0;
-		while(offset<fc.file_size || (pause_frames_cnt <= nb_pause_frames) )
+		if(out_mode != OUTPUT_MODE_FILE)
 		{
-			if(offset<fc.file_size)
+			switch(out_mode)
 			{
-				unsigned char c;
-
-				c = get_byte( &fc, offset, NULL );
-
-				mdm->tx_buffer_size = prepare_next_word( mdm, (int*)mdm->tx_buffer, c );
-				BitStreamToWave( mdm );
-				push_char( vdt_ctx, c );
-				write_wave_file(DEFAULT_SOUND_FILE,mdm->wave_buf,mdm->wave_size,mdm->sample_rate);
-			}
-			else
-			{
-				for(i=0;i<64;i++)
-				{
-					mdm->tx_buffer[i] = 1;
-				}
-				BitStreamToWave( mdm );
-				write_wave_file(DEFAULT_SOUND_FILE,mdm->wave_buf,mdm->wave_size,mdm->sample_rate);
-			}
-
-			totalsndsmp += mdm->sample_offset;
-
-			if( totalsndsmp >= next_pic_sndsmp )
-			{
-				if(!stdout_mode)
-				{
-					sprintf(ofilename,"I%.6d.bmp",image_nb);
-					fprintf(stderr,"Write bmp file : %s...\n",ofilename);
-				}
-
-				//write image...
-				render_videotex(vdt_ctx);
-				bmp.xsize = vdt_ctx->bmp_res_x;
-				bmp.ysize = vdt_ctx->bmp_res_y;
-				bmp.data = vdt_ctx->bmp_buffer;
-
-				if(!stdout_mode)
-					bmp24b_write(ofilename,&bmp);
-				else
-				{
-					for(i=0;i<(bmp.xsize * bmp.ysize);i++)
+				case OUTPUT_MODE_STDOUT:
+					while(!mdm_is_fifo_empty(&mdm->tx_fifo))
 					{
-						tmp_buf[(i*4)+1] = bmp.data[i] & 0xFF;
-						tmp_buf[(i*4)+2] = (bmp.data[i]>>8) & 0xFF;
-						tmp_buf[(i*4)+3] = (bmp.data[i]>>16) & 0xFF;
+						gen_stdout_frame(vdt_ctx, mdm, tmp_buf);
 					}
-					fwrite(tmp_buf, bmp.xsize * bmp.ysize * 4, 1, stdout);
-				}
 
-				image_nb++;
+					for(i=0;i<vdt_ctx->framerate * 2;i++)
+					{
+						gen_stdout_frame(vdt_ctx, mdm, tmp_buf);
+					}
+				break;
 
-				if(!(offset<fc.file_size))
-					pause_frames_cnt++;
-
-				next_pic_sndsmp = (int)(((double)mdm->sample_rate / (double)framerate) * image_nb);
+				case OUTPUT_MODE_SDL:
+					// Wait tx fifo empty
+					while(!mdm_is_fifo_empty(&mdm->tx_fifo))
+					{
+					}
+					usleep(2000*1000);
+				break;
 			}
-			offset++;
 		}
 
-		// Pad sound buffer...
-		totalneededsamples = (int)( ( (float)image_nb / (float)framerate) * (float)mdm->sample_rate);
-		while( totalsndsmp < totalneededsamples )
+		vdt_ctx->pages_cnt++;
+
+		offset = 0;
+		while( (offset<fc.file_size || !mdm_is_fifo_empty(&mdm->tx_fifo) || (pause_frames_cnt < vdt_ctx->framerate * 1)) && !(*quit) )
 		{
-			if( (totalneededsamples - totalsndsmp) > 64 )
+			while(!mdm_is_fifo_full(&mdm->tx_fifo) && offset<fc.file_size)
 			{
-				mdm->wave_size = FillWaveBuff(mdm, 64,0);
-				totalsndsmp += 64;
+				c = get_byte( &fc, offset, NULL );
+				mdm_push_to_fifo( &mdm->tx_fifo, c);
+				offset++;
 			}
-			else
+
+			if(offset>=fc.file_size)
 			{
-				mdm->wave_size = FillWaveBuff(mdm, (totalneededsamples - totalsndsmp),0);
-				totalsndsmp += (totalneededsamples - totalsndsmp);
+				pause_frames_cnt++;
+				if(out_mode == OUTPUT_MODE_SDL)
+				{
+					pause_frames_cnt =  vdt_ctx->framerate * 1;
+					sleep(2);
+				}
 			}
-			write_wave_file(DEFAULT_SOUND_FILE,mdm->wave_buf,mdm->wave_size,mdm->sample_rate);
+
+			switch(out_mode)
+			{
+				case OUTPUT_MODE_FILE:
+					update_frame(vdt_ctx,mdm, &bmp);
+					sprintf(ofilename,"I%.6d.bmp",image_nb);
+					fprintf(stderr,"Write bmp file : %s...\n",ofilename);
+					bmp24b_write(ofilename,&bmp);
+				break;
+
+				case OUTPUT_MODE_STDOUT:
+					gen_stdout_frame(vdt_ctx, mdm,tmp_buf);
+				break;
+
+#ifdef SDL_SUPPORT
+				case OUTPUT_MODE_SDL:
+					usleep(10000);
+				break;
+#endif
+			}
+
+			image_nb++;
 		}
 
 		if(tmp_buf)
@@ -261,9 +386,6 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framera
 	return 0;
 
 alloc_error:
-	if(vdt_ctx)
-		deinit_videotex(vdt_ctx);
-
 	if(tmp_buf)
 		free(tmp_buf);
 
@@ -272,7 +394,7 @@ alloc_error:
 	return -3;
 }
 
-int write_bmp(char * vdt_file, char * bmp_file, int pal, int stdout_mode)
+int write_bmp(char * vdt_file, char * bmp_file, int pal, int out_mode)
 {
 	char ofilename[512];
 	int offset;
@@ -287,10 +409,10 @@ int write_bmp(char * vdt_file, char * bmp_file, int pal, int stdout_mode)
 	ret = 0;
 	tmp_buf = NULL;
 
-	vdt_ctx = init_videotex();
+	vdt_ctx = vdt_init();
 	if(vdt_ctx)
 	{
-		if(stdout_mode)
+		if(out_mode)
 		{
 			tmp_buf = malloc(vdt_ctx->bmp_res_x * vdt_ctx->bmp_res_y * 4);
 			if(!tmp_buf)
@@ -299,11 +421,11 @@ int write_bmp(char * vdt_file, char * bmp_file, int pal, int stdout_mode)
 			memset(tmp_buf,0,vdt_ctx->bmp_res_x * vdt_ctx->bmp_res_y * 4);
 		}
 
-		select_palette(vdt_ctx,pal);
+		vdt_select_palette(vdt_ctx,pal);
 
-		load_charset(vdt_ctx,  NULL);
+		vdt_load_charset(vdt_ctx,  NULL);
 
-		if(!stdout_mode)
+		if(!out_mode)
 		{
 			if(strlen(bmp_file))
 			{
@@ -335,19 +457,19 @@ int write_bmp(char * vdt_file, char * bmp_file, int pal, int stdout_mode)
 			offset = 0;
 			while(offset<fc.file_size)
 			{
-				push_char(vdt_ctx, get_byte(&fc,offset, NULL) );
+				vdt_push_char(vdt_ctx, get_byte(&fc,offset, NULL) );
 				offset++;
 			}
 
 			close_file(&fc);
 
-			render_videotex(vdt_ctx);
+			vdt_render(vdt_ctx);
 
 			bmp.xsize = vdt_ctx->bmp_res_x;
 			bmp.ysize = vdt_ctx->bmp_res_y;
 			bmp.data = vdt_ctx->bmp_buffer;
 
-			if(!stdout_mode)
+			if(!out_mode)
 				bmp24b_write(ofilename,&bmp);
 			else
 			{
@@ -369,7 +491,7 @@ int write_bmp(char * vdt_file, char * bmp_file, int pal, int stdout_mode)
 		if(tmp_buf)
 			free(tmp_buf);
 
-		deinit_videotex(vdt_ctx);
+		vdt_deinit(vdt_ctx);
 	}
 	else
 	{
@@ -380,7 +502,7 @@ int write_bmp(char * vdt_file, char * bmp_file, int pal, int stdout_mode)
 
 alloc_error:
 	if(vdt_ctx)
-		deinit_videotex(vdt_ctx);
+		vdt_deinit(vdt_ctx);
 
 	if(tmp_buf)
 		free(tmp_buf);
@@ -396,14 +518,24 @@ int main(int argc, char* argv[])
 	char ofilename[512];
 	char strtmp[512];
 	modem_ctx mdm_ctx;
-	int pal,stdoutmode;
-	int i;
+	int pal, outmode;
+	int i,mic_mode;
 	float framerate;
 	videotex_ctx * vdt_ctx;
+	app_ctx appctx;
 
-	verbose = 0;
-	stdoutmode = 0;
+	memset(&appctx,0,sizeof(app_ctx));
+
+#ifdef SDL_SUPPORT
+	SDL_AudioSpec fmt;
+
+#endif
+
+	vdt_ctx = NULL;
+	appctx.quit = 0;
+	outmode = OUTPUT_MODE_FILE;
 	framerate = 30.0;
+	mic_mode = 0;
 
 	fprintf(stderr,"Minitel VDT to BMP converter v1.2.0.0\n");
 	fprintf(stderr,"Copyright (C) 2022-2023 Jean-Francois DEL NERO\n");
@@ -415,15 +547,69 @@ int main(int argc, char* argv[])
 	if(isOption(argc,argv,"verbose",0)>0)
 	{
 		fprintf(stderr,"verbose mode\n");
-		verbose=1;
+		appctx.verbose=1;
 	}
 
-	// Verbose option...
+	// stdout option...
 	if(isOption(argc,argv,"stdout",0)>0)
 	{
 		fprintf(stderr,"sdtout mode\n");
-		stdoutmode = 1;
+		outmode = OUTPUT_MODE_STDOUT;
 	}
+
+#ifdef SDL_SUPPORT
+	if(isOption(argc,argv,"mic",NULL)>0)
+	{
+		mic_mode = 1;
+		FIR_2100_1300_22050_Filter_init(&appctx.fir);
+	}
+
+#ifndef EMSCRIPTEN_SUPPORT
+	if(isOption(argc,argv,"sdl",0)>0)
+#endif
+	{
+		outmode = OUTPUT_MODE_SDL;
+		vdt_ctx = vdt_init();
+
+		if(vdt_ctx)
+		{
+			mdm_init(&mdm_ctx);
+
+			SDL_Init(SDL_INIT_EVERYTHING);
+
+			appctx.keystate = SDL_GetKeyboardState(NULL);
+
+			appctx.window = SDL_CreateWindow( "Minitel", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, vdt_ctx->bmp_res_x, vdt_ctx->bmp_res_y, SDL_WINDOW_SHOWN );
+			appctx.screen = SDL_GetWindowSurface( appctx.window );
+
+			appctx.mdm = &mdm_ctx;
+			appctx.vdt_ctx = vdt_ctx;
+
+			fmt.freq = mdm_ctx.sample_rate;
+			fmt.format = AUDIO_S16;
+			fmt.channels = 1;
+			fmt.samples = mdm_ctx.wave_size;
+			if(mic_mode)
+				fmt.callback = audio_in;
+			else
+				fmt.callback = audio_out;
+
+			fmt.userdata = &appctx;
+
+			appctx.audio_id = SDL_OpenAudioDevice(NULL, mic_mode, &fmt, NULL, SDL_AUDIO_ALLOW_ANY_CHANGE);
+			if ( appctx.audio_id < 0 )
+			{
+				fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
+			}
+			else
+			{
+				SDL_PauseAudioDevice( appctx.audio_id, SDL_FALSE );
+			}
+
+			appctx.timer = SDL_AddTimer(30, video_tick, &appctx);
+		}
+	}
+#endif
 
 	// help option...
 	if(isOption(argc,argv,"help",0)>0)
@@ -439,6 +625,8 @@ int main(int argc, char* argv[])
 	if(isOption(argc,argv,"fps",(char*)&strtmp))
 	{
 		framerate = atof(strtmp);
+		if(framerate <= 0)
+			framerate = 30.0;
 	}
 
 	if(isOption(argc,argv,"bmp",(char*)&ofilename))
@@ -454,7 +642,7 @@ int main(int argc, char* argv[])
 		{
 			if(argv[i][0] != '-')
 			{
-				write_bmp(argv[i], ofilename, pal,stdoutmode);
+				write_bmp(argv[i], ofilename, pal,outmode);
 			}
 
 			i++;
@@ -462,33 +650,49 @@ int main(int argc, char* argv[])
 	}
 
 	// Animation generator
+#ifndef EMSCRIPTEN_SUPPORT
 	if(isOption(argc,argv,"ani",NULL)>0)
+#endif
 	{
-		init_modem(&mdm_ctx);
+		mdm_init(&mdm_ctx);
 
-		vdt_ctx = init_videotex();
+		if(!vdt_ctx)
+			vdt_ctx = vdt_init();
+
 		if(vdt_ctx)
 		{
 			vdt_ctx->framerate = framerate;
 
 			if(isOption(argc,argv,"greyscale",NULL)>0)
 			{
-				select_palette(vdt_ctx,0);
+				vdt_select_palette(vdt_ctx,0);
 			}
 
-			load_charset(vdt_ctx, NULL);
+			vdt_load_charset(vdt_ctx, NULL);
 
-			remove(DEFAULT_SOUND_FILE);
-
-			i = 1;
-			while( i < argc)
+			if( !mic_mode )
 			{
-				if(argv[i][0] != '-')
+				remove(DEFAULT_SOUND_FILE);
+
+				i = 1;
+				while( i < argc && !appctx.quit)
 				{
-					animate(vdt_ctx,&mdm_ctx,argv[i],framerate,(int)(framerate*4),stdoutmode);
+					if(argv[i][0] != '-')
+					{
+						animate(vdt_ctx,&mdm_ctx,argv[i],framerate,(int)(framerate*4),outmode,&appctx.quit);
+					}
+					i++;
 				}
-				i++;
 			}
+			else
+			{
+				while( !appctx.quit)
+				{
+					usleep(1000*100);
+				}
+			}
+
+// emscripten_set_main_loop(drawRandomPixels, 60, 1);
 
 			fprintf(stderr,"Videotex pages count : %d \n",vdt_ctx->pages_cnt);
 			fprintf(stderr,"Videotex input bytes count : %d \n",vdt_ctx->input_bytes_cnt);
@@ -499,13 +703,28 @@ int main(int argc, char* argv[])
 			fprintf(stderr,"Sound duration : %f ms \n",((float)mdm_ctx.samples_generated_cnt/(float)mdm_ctx.sample_rate)*1000);
 			fprintf(stderr,"Video duration - Sound duration diff : %f ms \n",((float)((float)(vdt_ctx->rendered_images_cnt*1000)/(float)framerate)) - (((float)mdm_ctx.samples_generated_cnt/(float)mdm_ctx.sample_rate)*1000));
 
-			deinit_videotex(vdt_ctx);
+			vdt_deinit(vdt_ctx);
 		}
 	}
+
+#ifdef SDL_SUPPORT
+	if(appctx.window)
+	{
+		SDL_DestroyWindow( appctx.window );
+
+		SDL_RemoveTimer( appctx.timer );
+
+		SDL_PauseAudioDevice( appctx.audio_id, SDL_TRUE );
+
+		SDL_CloseAudioDevice( appctx.audio_id );
+	}
+	SDL_Quit();
+#endif
 
 	if( (isOption(argc,argv,"help",0)<=0) &&
 		(isOption(argc,argv,"vdt",0)<=0)  &&
 		(isOption(argc,argv,"ani",0)<=0)  &&
+		(isOption(argc,argv,"mic",0)<=0)  &&
 		(isOption(argc,argv,"bmp",0)<=0) )
 	{
 		printhelp(argv);
