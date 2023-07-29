@@ -26,7 +26,7 @@
 */
 
 #define DEFAULT_NUMBER_OF_CHANNELS 1
-#define DEFAULT_SAMPLERATE 44100
+#define DEFAULT_SAMPLERATE 22050
 
 #if defined(M_PI)
 #define PI M_PI
@@ -34,15 +34,15 @@
 #define PI 3.1415926535897932384626433832795
 #endif
 
-#define SERIAL_RX_FIFO_SIZE 1024
+#define SERIAL_FIFO_SIZE 1024
 
-typedef struct serial_rx_fifo_
+typedef struct serial_fifo_
 {
 	int in_ptr;
 	int out_ptr;
 
-	unsigned char fifo[SERIAL_RX_FIFO_SIZE];
-}serial_rx_fifo;
+	unsigned char fifo[SERIAL_FIFO_SIZE];
+}serial_fifo;
 
 typedef struct mean_ctx_
 {
@@ -94,8 +94,7 @@ typedef struct modem_ctx_
 	int baud_rate;
 
 	float bit_time;
-	float next_bitlimit;
-	int sample_offset;
+	int  tx_bittime_cnt;
 
 	int tx_buffer[64];
 	int tx_buffer_size;
@@ -115,15 +114,20 @@ typedef struct modem_ctx_
 	int serial_rx_parbitcnt;
 	int serial_rx_cnt;
 
-	serial_rx_fifo rx_fifo;
+	serial_fifo rx_fifo;
+	serial_fifo tx_fifo;
 
 }modem_ctx;
 
-void init_modem(modem_ctx *mdm);
-int write_wave_file(char* filename,short * wavebuf,int size,int samplerate);
-int prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte);
-int FillWaveBuff(modem_ctx *mdm, int size,int offset);
-int BitStreamToWave(modem_ctx *mdm);
-void demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wavebuf,int samplescnt);
-int push_to_rx_fifo(modem_ctx *mdm, unsigned char c);
-int pop_rx_fifo(modem_ctx *mdm, unsigned char * c);
+void mdm_init(modem_ctx *mdm);
+
+int  mdm_prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte);
+int  mdm_genWave(modem_ctx *mdm, short * buf, int size);
+void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wavebuf,int samplescnt);
+
+int  mdm_is_fifo_empty(serial_fifo *fifo);
+int  mdm_is_fifo_full(serial_fifo *fifo);
+int  mdm_push_to_fifo(serial_fifo *fifo, unsigned char c);
+int  mdm_pop_from_fifo(serial_fifo *fifo, unsigned char * c);
+
+int  write_wave_file(char* filename,short * wavebuf,int size,int samplerate);

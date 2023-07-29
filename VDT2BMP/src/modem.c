@@ -102,7 +102,7 @@ int write_wave_file(char* filename,short * wavebuf,int size,int samplerate)
 	return 0;
 }
 
-int prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte)
+int mdm_prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte)
 {
 	int i,j;
 	unsigned char mask;
@@ -199,40 +199,59 @@ int prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte)
 	return tx_buffer_size;
 }
 
-int push_to_rx_fifo(modem_ctx *mdm, unsigned char c)
+int mdm_is_fifo_empty(serial_fifo *fifo)
+{
+	if( ( fifo->in_ptr & (SERIAL_FIFO_SIZE-1) ) == ( fifo->out_ptr & (SERIAL_FIFO_SIZE-1) ) )
+	{
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
+}
+
+int mdm_is_fifo_full(serial_fifo *fifo)
+{
+	if( ( (fifo->in_ptr + 1) & (SERIAL_FIFO_SIZE-1) ) == ( fifo->out_ptr & (SERIAL_FIFO_SIZE-1) ) )
+	{
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
+}
+
+int mdm_push_to_fifo(serial_fifo *fifo, unsigned char c)
+{
+	if ( mdm_is_fifo_full(fifo) )
+		return 0;
+
+	fifo->fifo[(fifo->in_ptr & (SERIAL_FIFO_SIZE-1))] = c;
+
+	fifo->in_ptr = (fifo->in_ptr + 1) & (SERIAL_FIFO_SIZE-1);
+
+	return 1;
+}
+
+int mdm_pop_from_fifo(serial_fifo *fifo, unsigned char * c)
 {
 	int ret;
 
 	ret = 0;
-	mdm->rx_fifo.fifo[(mdm->rx_fifo.in_ptr & (SERIAL_RX_FIFO_SIZE-1))] = c;
 
-	mdm->rx_fifo.in_ptr = (mdm->rx_fifo.in_ptr + 1) & (SERIAL_RX_FIFO_SIZE-1);
-	if( ( mdm->rx_fifo.in_ptr & (SERIAL_RX_FIFO_SIZE-1) ) == ( mdm->rx_fifo.out_ptr & (SERIAL_RX_FIFO_SIZE-1) ) )
+	if( !mdm_is_fifo_empty(fifo) )
 	{
-		mdm->rx_fifo.out_ptr = (mdm->rx_fifo.out_ptr + 1) & (SERIAL_RX_FIFO_SIZE-1);
+		*c = fifo->fifo[fifo->out_ptr & (SERIAL_FIFO_SIZE-1)];
+		fifo->out_ptr = (fifo->out_ptr + 1) & (SERIAL_FIFO_SIZE-1);
 		ret = 1;
 	}
 
 	return ret;
 }
 
-int pop_rx_fifo(modem_ctx *mdm, unsigned char * c)
-{
-	int ret;
-
-	ret = 0;
-
-	if( ( mdm->rx_fifo.in_ptr & (SERIAL_RX_FIFO_SIZE-1) ) != ( mdm->rx_fifo.out_ptr & (SERIAL_RX_FIFO_SIZE-1) ) )
-	{
-		*c = mdm->rx_fifo.fifo[(mdm->rx_fifo.out_ptr & (SERIAL_RX_FIFO_SIZE-1))];
-		mdm->rx_fifo.out_ptr = (mdm->rx_fifo.out_ptr + 1) & (SERIAL_RX_FIFO_SIZE-1);
-		ret = 1;
-	}
-
-	return ret;
-}
-
-int serial_rx(modem_ctx *mdm, int state)
+int mdm_serial_rx(modem_ctx *mdm, int state)
 {
 	unsigned char mask;
 
@@ -306,7 +325,10 @@ int serial_rx(modem_ctx *mdm, int state)
 			mdm->serial_rx_state = 0;
 			mdm->serial_rx_delay = 0;
 
-			push_to_rx_fifo(mdm, mdm->serial_rx_shiftreg);
+			if( !mdm_push_to_fifo(&mdm->rx_fifo, mdm->serial_rx_shiftreg) )
+			{
+				printf("RX Fifo full !\n");
+			}
 
 #if 0
 			printf("RX : 0x%.2X\n",mdm->serial_rx_shiftreg);
@@ -320,62 +342,82 @@ int serial_rx(modem_ctx *mdm, int state)
 
 }
 
-int FillWaveBuff(modem_ctx *mdm, int size,int offset)
+// cur_state_ticks
+//
+int mdm_genWave(modem_ctx *mdm, short * buf, int size)
 {
-	int i;
+	int i,bit_state;
+	unsigned char c;
+	short * buffer;
 
-	if(mdm->Frequency!=0 && (mdm->Frequency!=mdm->OldFrequency))
-	{   // Sync the frequency change...
-		mdm->sinoffset = (mdm->OldFrequency*mdm->sinoffset) / mdm->Frequency;
-		mdm->OldFrequency = mdm->Frequency;
-	}
+	buffer = mdm->wave_buf;
+
+	if(buf)
+		buffer = buf;
 
 	i = 0;
-	while( i < size )
+	do
 	{
-		*(mdm->wave_buf+offset) = (int)(sin((double)((double)2*(double)PI*((double)mdm->Frequency)*(double)mdm->sinoffset)/(double)mdm->sample_rate)*(double)mdm->Amplitude);
-		mdm->sinoffset++;
-		mdm->sample_offset++;
-		mdm->samples_generated_cnt++;
-		i++;
-		offset++;
-	}
-
-	return offset;
-}
-
-int BitStreamToWave(modem_ctx *mdm)
-{
-	int i,j;
-	int cnt = 0;
-
-	mdm->next_bitlimit -= mdm->sample_offset;
-	mdm->sample_offset = 0;
-
-	j = 0;
-	for( i = 0;i < mdm->tx_buffer_size;i++ )
-	{
-		switch(mdm->tx_buffer[i])
+		if(mdm->tx_bittime_cnt <= 0)
 		{
-			case 0:
-				mdm->Frequency = mdm->zero_freq;
-			break;
-			case 1:
-				mdm->Frequency = mdm->one_freq;
-			break;
-			default:
-				mdm->Frequency = mdm->idle_freq;
-			break;
+			if( mdm->tx_buffer_offset < mdm->tx_buffer_size )
+			{
+				bit_state = mdm->tx_buffer[mdm->tx_buffer_offset];
+
+				mdm->tx_buffer_offset++;
+
+				mdm->tx_bittime_cnt = mdm->bit_time;
+
+				if(bit_state)
+					mdm->Frequency = mdm->one_freq;
+				else
+					mdm->Frequency = mdm->zero_freq;
+			}
+			else
+			{
+				if( mdm_pop_from_fifo(&mdm->tx_fifo, &c) )
+				{
+					mdm->tx_buffer_size = mdm_prepare_next_word( mdm, (int*)mdm->tx_buffer, c );
+					mdm->tx_buffer_offset = 0;
+
+					bit_state = mdm->tx_buffer[mdm->tx_buffer_offset];
+
+					mdm->tx_buffer_offset++;
+
+					mdm->tx_bittime_cnt = (int)mdm->bit_time;
+
+					if(bit_state)
+						mdm->Frequency = mdm->one_freq;
+					else
+						mdm->Frequency = mdm->zero_freq;
+				}
+				else
+				{
+					mdm->tx_buffer_size = 0;
+					bit_state = 1;
+					mdm->Frequency = mdm->one_freq;
+				}
+			}
+		}
+		else
+		{
+			mdm->tx_bittime_cnt--;
 		}
 
-		j = FillWaveBuff(mdm, ((int)mdm->next_bitlimit - mdm->sample_offset), j);
+		if(mdm->Frequency!=0 && (mdm->Frequency!=mdm->OldFrequency))
+		{   // Sync the frequency change... Keep the same phase.
+			mdm->sinoffset = (mdm->OldFrequency*mdm->sinoffset) / mdm->Frequency;
+			mdm->OldFrequency = mdm->Frequency;
+		}
 
-		mdm->next_bitlimit += mdm->bit_time;
-	}
+		*buffer++ = (int)(sin((double)((double)2*(double)PI*((double)mdm->Frequency)*(double)mdm->sinoffset)/(double)mdm->sample_rate)*(double)mdm->Amplitude);
+		mdm->sinoffset++;
+		mdm->samples_generated_cnt++;
+		i++;
 
-	mdm->wave_size = j;
+	}while(i<size);
 
-	return cnt;
+	return 0;
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -444,7 +486,7 @@ int BitStreamToWave(modem_ctx *mdm)
 //                  |_____|
 //
 
-float add_and_compute_mean(mean_ctx * ctx, float val)
+static float add_and_compute_mean(mean_ctx * ctx, float val)
 {
 	int i;
 	float result;
@@ -467,7 +509,7 @@ float add_and_compute_mean(mean_ctx * ctx, float val)
 	return result;
 }
 
-void demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wavebuf,int samplescnt)
+void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wavebuf,int samplescnt)
 {
 	int i,j;
 	int bit;
@@ -502,7 +544,7 @@ void demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wavebuf,
 		if(result>=0)
 			bit = 1;
 
-		serial_rx(mdm, bit);
+		mdm_serial_rx(mdm, bit);
 
 #if 0
 		printf("%f;%f;%f;%f;%f;%f;%f;%d\n",mdm_dmt->power[0],mdm_dmt->power[1],mdm_dmt->power[2],mdm_dmt->power[3],mdm_dmt->add[0],mdm_dmt->add[1],result,bit);
@@ -514,7 +556,7 @@ void demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wavebuf,
 	}
 }
 
-void init_modem(modem_ctx *mdm)
+void mdm_init(modem_ctx *mdm)
 {
 	int i;
 
@@ -534,7 +576,7 @@ void init_modem(modem_ctx *mdm)
 		mdm->sample_rate = DEFAULT_SAMPLERATE;
 		mdm->baud_rate = 1200;
 		mdm->bit_time =  ((float)mdm->sample_rate / (float)mdm->baud_rate);
-		mdm->Amplitude = (int)(32767 * (float)((float)80/100));
+		mdm->Amplitude = (int)(32767 * (float)((float)5/100));
 
 		mdm->demodulators[0].freqs[0] = 2100;
 		mdm->demodulators[0].freqs[1] = 1300;
@@ -546,8 +588,11 @@ void init_modem(modem_ctx *mdm)
 			mdm->demodulators[0].mean[i].mean_max_idx = (int)((float)((mdm->sample_rate / mdm->baud_rate)) * 0.75);
 		}
 
-		mdm->wave_buf = malloc(256 * 1024 * sizeof(short));
+		mdm->wave_buf = malloc(1024 * sizeof(short));
 		if(mdm->wave_buf )
-			memset(mdm->wave_buf,0,256 * 1024 * sizeof(short));
+		{
+			mdm->wave_size = 1024;
+			memset(mdm->wave_buf,0, mdm->wave_size * sizeof(short));
+		}
 	}
 }
