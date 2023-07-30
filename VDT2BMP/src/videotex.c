@@ -47,6 +47,7 @@ videotex decoder.
 // 320*250 screen resolution
 
 //#define DEBUG 1
+//#define VDT_JPEG_SUPPORT 1
 
 #ifdef DEBUG
 #define LOG(...) fprintf(stderr,__VA_ARGS__)
@@ -1167,13 +1168,13 @@ void vdt_push_char(videotex_ctx * ctx, unsigned char c)
 				case 0x61:
 					LOG("Demande de position\n");
 				break;
-
+#ifdef VDT_JPEG_SUPPORT
 				case 0x70:
 					LOG("Minitel Photo JPEG image...\n");
 					next_decoder_state = 0x70;
 					ctx->jpg_rx_cnt = 0;
 				break;
-
+#endif
 				default:
 					if(c >= 0x40 && c <= 0x47)
 					{
@@ -1218,6 +1219,8 @@ void vdt_push_char(videotex_ctx * ctx, unsigned char c)
 				vdt_resetstate(ctx);
 			}
 		break;
+
+#ifdef VDT_JPEG_SUPPORT
 		case 0x70:
 			// JPEG download...
 
@@ -1251,6 +1254,7 @@ void vdt_push_char(videotex_ctx * ctx, unsigned char c)
 				break;
 			}
 		break;
+#endif
 		default:
 			ERROR("UNSUPPORTED STATE: 0x%.2X\n",c);
 		break;
