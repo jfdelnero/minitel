@@ -41,13 +41,13 @@ endif
 
 all: $(EXEC)
 
-vdt2bmp:  vdt2bmp.o videotex.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o vdt_test_001.o
+vdt2bmp:  vdt2bmp.o videotex.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
 	$(CC) -o $@    $^ $(LDFLAGS)
 
-vdt2bmp_asmjs.js:  vdt2bmp.o videotex.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o vdt_test_001.o
+vdt2bmp_asmjs.js:  vdt2bmp.o videotex.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
 	$(CC) -o $@    $^ $(LDFLAGS)
 
-vdt2bmp_wasm.js:  vdt2bmp.o videotex.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o vdt_test_001.o
+vdt2bmp_wasm.js:  vdt2bmp.o videotex.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
 	$(CC) -o $@    $^ $(LDFLAGS_WASM)
 
 vdt2bmp.o: ../src/vdt2bmp.c
@@ -75,6 +75,12 @@ FIR_V22_Minitel.o: ../src/FIR/FIR_V22_Minitel.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 vdt_test_001.o: ../src/data/vdt_test_001.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+vdt_test_002.o: ../src/data/vdt_test_002.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+vdt_test_003.o: ../src/data/vdt_test_003.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 clean:

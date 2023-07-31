@@ -114,13 +114,15 @@ Uint32 video_tick(Uint32 interval, void *param)
 	bitmap_data bmp;
 	videotex_ctx * vdt_ctx;
 	modem_ctx *mdm;
+	app_ctx *app;
 	SDL_Surface *sdl_scr;
 	SDL_Event e;
 	int i;
 
-	mdm = ((app_ctx *)param)->mdm;
-	vdt_ctx = ((app_ctx *)param)->vdt_ctx;
-	sdl_scr = ((app_ctx *)param)->screen;
+	app = ((app_ctx *)param);
+	mdm = app->mdm;
+	vdt_ctx = app->vdt_ctx;
+	sdl_scr = app->screen;
 
 	update_frame(vdt_ctx,mdm, &bmp);
 
@@ -129,17 +131,26 @@ Uint32 video_tick(Uint32 interval, void *param)
 
 	pixels = sdl_scr->pixels;
 
+#ifdef EMSCRIPTEN_SUPPORT
+	for(i=0;i<(bmp.xsize * bmp.ysize);i++)
+	{
+		pixels[(i*4)+0] = bmp.data[i] & 0xFF;
+		pixels[(i*4)+1] = (bmp.data[i]>>8) & 0xFF;
+		pixels[(i*4)+2] = (bmp.data[i]>>16) & 0xFF;
+	}
+#else
 	for(i=0;i<(bmp.xsize * bmp.ysize);i++)
 	{
 		pixels[(i*4)+2] = bmp.data[i] & 0xFF;
 		pixels[(i*4)+1] = (bmp.data[i]>>8) & 0xFF;
 		pixels[(i*4)+0] = (bmp.data[i]>>16) & 0xFF;
 	}
+#endif
 
 	if (SDL_MUSTLOCK(sdl_scr))
 		SDL_UnlockSurface(sdl_scr);
 
-	SDL_UpdateWindowSurface(((app_ctx *)param)->window);
+	SDL_UpdateWindowSurface(app->window);
 
 	SDL_PollEvent(&e);
 	if (e.type == SDL_QUIT)
@@ -147,28 +158,37 @@ Uint32 video_tick(Uint32 interval, void *param)
 
 #ifdef EMSCRIPTEN_SUPPORT
 	// Test page loop
-	((app_ctx *)param)->imgcnt++;
+	app->imgcnt++;
 
-	if(((app_ctx *)param)->imgcnt > vdt_ctx->framerate * 2 )
+	if(app->imgcnt > vdt_ctx->framerate * 2 )
 	{
-		if(((app_ctx *)param)->indexbuf >= sizeof(vdt_test_001))
+		
+		if(app->indexbuf >= vdt_test_pages_size[app->pageindex] )
 		{
 			if( mdm_is_fifo_empty(&mdm->tx_fifo) )
 			{
-				((app_ctx *)param)->indexbuf = 0;
-				((app_ctx *)param)->imgcnt = 0;
+				app->indexbuf = 0;
+				app->imgcnt = 0;
+
+				app->pageindex++;
+				if(vdt_test_pages[app->pageindex] == NULL)
+					app->pageindex = 0;
+
 			}
 		}
 		else
 		{
-			while( ((app_ctx *)param)->indexbuf < sizeof(vdt_test_001) )
+			unsigned char * ptr;
+			
+			ptr = vdt_test_pages[app->pageindex];
+			while( app->indexbuf < vdt_test_pages_size[app->pageindex] )
 			{
-				if( !mdm_push_to_fifo( &mdm->tx_fifo, vdt_test_001[((app_ctx *)param)->indexbuf] ) )
+				if( !mdm_push_to_fifo( &mdm->tx_fifo, ptr[app->indexbuf] ) )
 				{
 					break;
 				}
 
-				((app_ctx *)param)->indexbuf++;
+				app->indexbuf++;
 			}
 		}
 	}

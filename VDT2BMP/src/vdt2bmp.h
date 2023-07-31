@@ -43,6 +43,7 @@ typedef struct app_ctx_
 
 	int indexbuf;
 	int imgcnt;
+	int pageindex;
 
 }app_ctx;
 
