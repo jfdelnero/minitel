@@ -52,7 +52,7 @@ Available command line options :
 #include <SDL2/SDL_audio.h>
 #endif
 
-#ifdef EMSCRIPTEN_SUPPORT
+#ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
 
@@ -62,6 +62,8 @@ Available command line options :
 #include "modem.h"
 
 #include "FIR/FIR_V22_Minitel.h"
+
+#include "data/vdt_tests.h"
 
 #include "vdt2bmp.h"
 
@@ -139,12 +141,64 @@ Uint32 video_tick(Uint32 interval, void *param)
 
 	SDL_UpdateWindowSurface(((app_ctx *)param)->window);
 
-    SDL_PollEvent(&e);
-    if (e.type == SDL_QUIT)
+	SDL_PollEvent(&e);
+	if (e.type == SDL_QUIT)
 		((app_ctx *)param)->quit = 1;
+
+#ifdef EMSCRIPTEN_SUPPORT
+	// Test page loop
+	((app_ctx *)param)->imgcnt++;
+
+	if(((app_ctx *)param)->imgcnt > vdt_ctx->framerate * 2 )
+	{
+		if(((app_ctx *)param)->indexbuf >= sizeof(vdt_test_001))
+		{
+			if( mdm_is_fifo_empty(&mdm->tx_fifo) )
+			{
+				((app_ctx *)param)->indexbuf = 0;
+				((app_ctx *)param)->imgcnt = 0;
+			}
+		}
+		else
+		{
+			while( ((app_ctx *)param)->indexbuf < sizeof(vdt_test_001) )
+			{
+				if( !mdm_push_to_fifo( &mdm->tx_fifo, vdt_test_001[((app_ctx *)param)->indexbuf] ) )
+				{
+					break;
+				}
+
+				((app_ctx *)param)->indexbuf++;
+			}
+		}
+	}
+#endif
 
 	return interval;
 }
+
+#ifdef EMSCRIPTEN_SUPPORT
+void emscripten_vid_callback(void* param)
+{
+	SDL_Event event;
+
+	while(SDL_PollEvent(&event))
+	{
+		if( event.type == SDL_QUIT )
+		{
+			exit(0);
+		}
+		else
+		{
+			if( event.type == SDL_MOUSEBUTTONDOWN )
+			{
+			}
+		}
+	}
+
+	video_tick(16, param);
+}
+#endif
 
 #endif
 
@@ -154,6 +208,9 @@ int isOption(int argc, char* argv[],char * paramtosearch,char * argtoparam)
 	int i,j;
 
 	char option[512];
+
+	if(!argv)
+		return -1;
 
 	memset(option,0,sizeof(option));
 
@@ -558,15 +615,14 @@ int main(int argc, char* argv[])
 	}
 
 #ifdef SDL_SUPPORT
+
 	if(isOption(argc,argv,"mic",NULL)>0)
 	{
 		mic_mode = 1;
 		FIR_2100_1300_22050_Filter_init(&appctx.fir);
 	}
 
-#ifndef EMSCRIPTEN_SUPPORT
 	if(isOption(argc,argv,"sdl",0)>0)
-#endif
 	{
 		outmode = OUTPUT_MODE_SDL;
 		vdt_ctx = vdt_init();
@@ -585,6 +641,15 @@ int main(int argc, char* argv[])
 			appctx.mdm = &mdm_ctx;
 			appctx.vdt_ctx = vdt_ctx;
 
+			if(!(SDL_WasInit(SDL_INIT_AUDIO) & SDL_INIT_AUDIO))
+			{
+				if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
+				{
+					fprintf(stderr, "ERROR : SDL_INIT_AUDIO not initialized !\n");
+					return -1;
+				}
+			}
+
 			fmt.freq = mdm_ctx.sample_rate;
 			fmt.format = AUDIO_S16;
 			fmt.channels = 1;
@@ -596,7 +661,7 @@ int main(int argc, char* argv[])
 
 			fmt.userdata = &appctx;
 
-			appctx.audio_id = SDL_OpenAudioDevice(NULL, mic_mode, &fmt, NULL, SDL_AUDIO_ALLOW_ANY_CHANGE);
+			appctx.audio_id = SDL_OpenAudioDevice(NULL, mic_mode, &fmt, &fmt, 0);
 			if ( appctx.audio_id < 0 )
 			{
 				fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
@@ -606,7 +671,9 @@ int main(int argc, char* argv[])
 				SDL_PauseAudioDevice( appctx.audio_id, SDL_FALSE );
 			}
 
+			#ifndef EMSCRIPTEN_SUPPORT
 			appctx.timer = SDL_AddTimer(30, video_tick, &appctx);
+			#endif
 		}
 	}
 #endif
@@ -650,9 +717,7 @@ int main(int argc, char* argv[])
 	}
 
 	// Animation generator
-#ifndef EMSCRIPTEN_SUPPORT
 	if(isOption(argc,argv,"ani",NULL)>0)
-#endif
 	{
 		mdm_init(&mdm_ctx);
 
@@ -672,7 +737,31 @@ int main(int argc, char* argv[])
 
 			if( !mic_mode )
 			{
+
+				#ifndef EMSCRIPTEN_SUPPORT
 				remove(DEFAULT_SOUND_FILE);
+				#endif
+
+				#ifdef EMSCRIPTEN_SUPPORT
+
+				emscripten_set_main_loop_arg(emscripten_vid_callback, &appctx, 30, 0);
+
+				while(1)
+				{
+					emscripten_sleep(10);
+
+					i = 0;
+					while( i < sizeof(vdt_test_001) )
+					{
+						if( !mdm_push_to_fifo( &mdm_ctx.tx_fifo, vdt_test_001[i] ) )
+						{
+							emscripten_sleep(10);
+						}
+						i++;
+					}
+				}
+
+				#endif
 
 				i = 1;
 				while( i < argc && !appctx.quit)
@@ -686,13 +775,15 @@ int main(int argc, char* argv[])
 			}
 			else
 			{
+				#ifdef EMSCRIPTEN_SUPPORT
+				emscripten_set_main_loop_arg(emscripten_vid_callback, &appctx, 30, 1);
+				#endif
+
 				while( !appctx.quit)
 				{
 					usleep(1000*100);
 				}
 			}
-
-// emscripten_set_main_loop(drawRandomPixels, 60, 1);
 
 			fprintf(stderr,"Videotex pages count : %d \n",vdt_ctx->pages_cnt);
 			fprintf(stderr,"Videotex input bytes count : %d \n",vdt_ctx->input_bytes_cnt);

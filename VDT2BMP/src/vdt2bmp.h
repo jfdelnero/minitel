@@ -41,6 +41,9 @@ typedef struct app_ctx_
 	int audio_id;
 #endif
 
+	int indexbuf;
+	int imgcnt;
+
 }app_ctx;
 
 enum {
