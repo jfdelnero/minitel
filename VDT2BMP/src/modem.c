@@ -346,7 +346,7 @@ int mdm_serial_rx(modem_ctx *mdm, int state)
 //
 int mdm_genWave(modem_ctx *mdm, short * buf, int size)
 {
-	int i,bit_state;
+	int i;
 	unsigned char c;
 	short * buffer;
 
@@ -362,16 +362,11 @@ int mdm_genWave(modem_ctx *mdm, short * buf, int size)
 		{
 			if( mdm->tx_buffer_offset < mdm->tx_buffer_size )
 			{
-				bit_state = mdm->tx_buffer[mdm->tx_buffer_offset];
+				mdm->last_bitstate = mdm->tx_buffer[mdm->tx_buffer_offset];
 
 				mdm->tx_buffer_offset++;
 
 				mdm->tx_bittime_cnt = mdm->bit_time;
-
-				if(bit_state)
-					mdm->Frequency = mdm->one_freq;
-				else
-					mdm->Frequency = mdm->zero_freq;
 			}
 			else
 			{
@@ -380,22 +375,17 @@ int mdm_genWave(modem_ctx *mdm, short * buf, int size)
 					mdm->tx_buffer_size = mdm_prepare_next_word( mdm, (int*)mdm->tx_buffer, c );
 					mdm->tx_buffer_offset = 0;
 
-					bit_state = mdm->tx_buffer[mdm->tx_buffer_offset];
+					mdm->last_bitstate = mdm->tx_buffer[mdm->tx_buffer_offset];
 
 					mdm->tx_buffer_offset++;
 
 					mdm->tx_bittime_cnt = (int)mdm->bit_time;
 
-					if(bit_state)
-						mdm->Frequency = mdm->one_freq;
-					else
-						mdm->Frequency = mdm->zero_freq;
 				}
 				else
 				{
 					mdm->tx_buffer_size = 0;
-					bit_state = 1;
-					mdm->Frequency = mdm->one_freq;
+					mdm->last_bitstate = 1;
 				}
 			}
 		}
@@ -404,14 +394,11 @@ int mdm_genWave(modem_ctx *mdm, short * buf, int size)
 			mdm->tx_bittime_cnt--;
 		}
 
-		if(mdm->Frequency!=0 && (mdm->Frequency!=mdm->OldFrequency))
-		{   // Sync the frequency change... Keep the same phase.
-			mdm->sinoffset = (mdm->OldFrequency*mdm->sinoffset) / mdm->Frequency;
-			mdm->OldFrequency = mdm->Frequency;
-		}
+		*buffer++ = (int)(sinf(mdm->phase)*(float)mdm->Amplitude);
+		mdm->phase += mdm->mod_step[mdm->last_bitstate];
+		if( mdm->phase > 2 * PI )
+			mdm->phase -= 2 * PI;
 
-		*buffer++ = (int)(sin((double)((double)2*(double)PI*((double)mdm->Frequency)*(double)mdm->sinoffset)/(double)mdm->sample_rate)*(double)mdm->Amplitude);
-		mdm->sinoffset++;
 		mdm->samples_generated_cnt++;
 		i++;
 
@@ -509,6 +496,11 @@ static float add_and_compute_mean(mean_ctx * ctx, float val)
 	return result;
 }
 
+float freq2step(unsigned int sample_rate, int freq )
+{
+	return (2*PI*((float)freq)) /(float)sample_rate;
+}
+
 void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wavebuf,int samplescnt)
 {
 	int i,j;
@@ -520,7 +512,7 @@ void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wave
 	{
 		for(j=0;j<4;j++)
 		{
-			f1_sincos = sinf((double)(((double)2*(double)PI*((double)mdm_dmt->freqs[j>>1] )*(double)mdm_dmt->sinoffs)/(double)mdm_dmt->sample_rate) + ((PI/2.0)*(j&1)) );
+			f1_sincos = sinf( mdm_dmt->phase[j>>1] + ((PI/2.0)*(j&1)) );
 
 			mul_freq = f1_sincos * (float)(wavebuf[i]/(float)32765);
 
@@ -531,6 +523,14 @@ void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wave
 			mdm_dmt->power[j] = mdm_dmt->old_integrator_res[j] * mdm_dmt->old_integrator_res[j];
 
 			add_and_compute_mean(&mdm_dmt->mean[j], mdm_dmt->power[j]);
+		}
+
+		for(j=0;j<2;j++)
+		{
+			mdm_dmt->phase[j] += mdm_dmt->mod_step[j];
+
+			if( mdm_dmt->phase[j] > 2 * PI )
+				mdm_dmt->phase[j] -= 2 * PI;
 		}
 
 		for(j=0;j<2;j++)
@@ -551,8 +551,6 @@ void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wave
 #endif
 
 		mdm_dmt->oldbit = bit;
-
-		mdm_dmt->sinoffs++;
 	}
 }
 
@@ -570,18 +568,33 @@ void mdm_init(modem_ctx *mdm)
 		mdm->serial_nbstop = 1;
 		mdm->serial_pre_idle = 0;
 		mdm->serial_post_idle = 0;
-		mdm->zero_freq = 2100;
-		mdm->one_freq = 1300;
-		mdm->idle_freq = 1300;
+
+		mdm->freqs[0] = 2100;// Zero
+		mdm->freqs[1] = 1300;// One
+		mdm->freqs[2] = 1300;// Idle
+
 		mdm->sample_rate = DEFAULT_SAMPLERATE;
+
+		for(i=0;i<3;i++)
+		{
+			mdm->mod_step[i] = freq2step(mdm->sample_rate, mdm->freqs[i] );
+		}
+		mdm->phase = 0;
+
 		mdm->baud_rate = 1200;
 		mdm->bit_time =  ((float)mdm->sample_rate / (float)mdm->baud_rate);
 		mdm->Amplitude = (int)(32767 * (float)((float)80/100));
 
-		mdm->demodulators[0].freqs[0] = 2100;
-		mdm->demodulators[0].freqs[1] = 1300;
 		mdm->demodulators[0].sample_rate = DEFAULT_SAMPLERATE;
 		mdm->demodulators[0].bit_time = (mdm->sample_rate / mdm->baud_rate);
+
+		mdm->demodulators[0].freqs[0] = 2100;
+		mdm->demodulators[0].freqs[1] = 1300;
+		for(i=0;i<2;i++)
+		{
+			mdm->demodulators[0].mod_step[i] = freq2step(mdm->demodulators[0].sample_rate, mdm->demodulators[0].freqs[i] );
+			mdm->demodulators[0].phase[i] = 0;
+		}
 
 		for(i=0;i<4;i++)
 		{

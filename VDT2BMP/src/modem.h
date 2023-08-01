@@ -56,9 +56,10 @@ typedef struct mean_ctx_
 typedef struct modem_demodulator_ctx_
 {
 	unsigned int freqs[2];
+	float mod_step[2];
+	float phase[2];
 
 	unsigned int sample_rate;
-	unsigned int sinoffs;
 	float old_integrator_res[4];
 	float power[4];
 	float add[2];
@@ -81,12 +82,11 @@ typedef struct modem_ctx_
 	int serial_post_idle;
 	int serial_msb_first;
 
-	double one_freq;
-	double zero_freq;
-	double idle_freq;
+	unsigned int freqs[3];
+	float mod_step[3];
+	float phase;
 
-	double sinoffset;
-	double Frequency,OldFrequency;
+	int last_bitstate;
 
 	int sample_rate;
 	int Amplitude;
