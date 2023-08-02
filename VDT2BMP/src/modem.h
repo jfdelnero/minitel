@@ -63,11 +63,9 @@ typedef struct modem_demodulator_ctx_
 	float old_integrator_res[4];
 	float power[4];
 	float add[2];
-	float mul[4];
 
 	mean_ctx mean[4];
 
-	int oldbit;
 	int bit_time;
 
 }modem_demodulator_ctx;

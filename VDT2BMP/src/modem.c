@@ -26,8 +26,8 @@
 */
 
 /*
- Minitel Modem
-(C) 2022-2O23 Jean-François DEL NERO
+ FSK Modem
+ (C) 2022-2O23 Jean-François DEL NERO
 */
 
 #include <stdio.h>
@@ -342,8 +342,6 @@ int mdm_serial_rx(modem_ctx *mdm, int state)
 
 }
 
-// cur_state_ticks
-//
 int mdm_genWave(modem_ctx *mdm, short * buf, int size)
 {
 	int i;
@@ -501,6 +499,9 @@ float freq2step(unsigned int sample_rate, int freq )
 	return (2*PI*((float)freq)) /(float)sample_rate;
 }
 
+//
+// Main demodulator function
+//
 void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wavebuf,int samplescnt)
 {
 	int i,j;
@@ -510,47 +511,55 @@ void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wave
 
 	for(i=0;i<samplescnt;i++)
 	{
+		// f1 & f2 frequencies generation + quadrature sinus / cosinus multiply operation.
 		for(j=0;j<4;j++)
 		{
+			// Generate sinus / cosinus signals
 			f1_sincos = sinf( mdm_dmt->phase[j>>1] + ((PI/2.0)*(j&1)) );
 
+			// Multiply the input signal with the generated signal
 			mul_freq = f1_sincos * (float)(wavebuf[i]/(float)32765);
 
-			mdm_dmt->mul[j] = f1_sincos;
-
+			// Basic integrator with leak
 			mdm_dmt->old_integrator_res[j] =  (((float)mdm_dmt->old_integrator_res[j]) * 0.9) + mul_freq;
 
+			// Power computation
 			mdm_dmt->power[j] = mdm_dmt->old_integrator_res[j] * mdm_dmt->old_integrator_res[j];
 
+			// Windowed mean calculation
 			add_and_compute_mean(&mdm_dmt->mean[j], mdm_dmt->power[j]);
 		}
 
+		// Next phase calculation for both oscillator.
 		for(j=0;j<2;j++)
 		{
 			mdm_dmt->phase[j] += mdm_dmt->mod_step[j];
 
+			// Prevent overflow/performance issue.
 			if( mdm_dmt->phase[j] > 2 * PI )
 				mdm_dmt->phase[j] -= 2 * PI;
 		}
 
+		// Add "I" and "Q" power for both frequencies.
 		for(j=0;j<2;j++)
 		{
 			mdm_dmt->add[j] = mdm_dmt->mean[j*2].mean + mdm_dmt->mean[(j*2)+1].mean;
 		}
 
+		// And finally to the difference between the f1 and f2 power.
 		result = mdm_dmt->add[1] - mdm_dmt->add[0];
 
+		// If < 0 -> '0' logic state. If >= 0 -> '1' logic state
 		bit = 0;
 		if(result>=0)
 			bit = 1;
 
+		// Feed the UART RX input
 		mdm_serial_rx(mdm, bit);
 
 #if 0
 		printf("%f;%f;%f;%f;%f;%f;%f;%d\n",mdm_dmt->power[0],mdm_dmt->power[1],mdm_dmt->power[2],mdm_dmt->power[3],mdm_dmt->add[0],mdm_dmt->add[1],result,bit);
 #endif
-
-		mdm_dmt->oldbit = bit;
 	}
 }
 
