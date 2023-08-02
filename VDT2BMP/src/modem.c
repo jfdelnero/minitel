@@ -592,7 +592,7 @@ void mdm_init(modem_ctx *mdm)
 
 		mdm->baud_rate = 1200;
 		mdm->bit_time =  ((float)mdm->sample_rate / (float)mdm->baud_rate);
-		mdm->Amplitude = (int)(32767 * (float)((float)80/100));
+		mdm->Amplitude = (int)(32767 * (float)((float)70/100));
 
 		mdm->demodulators[0].sample_rate = DEFAULT_SAMPLERATE;
 		mdm->demodulators[0].bit_time = (mdm->sample_rate / mdm->baud_rate);

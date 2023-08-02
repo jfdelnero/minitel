@@ -32,7 +32,8 @@ typedef struct app_ctx_
 	int verbose;
 	int quit;
 	int fir_en;
-	FIR_2100_1300_22050_Filter fir;
+	low_pass_tx_Filter tx_fir;
+	band_pass_rx_Filter rx_fir;
 #ifdef SDL_SUPPORT
 	SDL_Surface *screen;
 	SDL_TimerID timer;

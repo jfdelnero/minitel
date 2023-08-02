@@ -61,7 +61,8 @@ Available command line options :
 #include "bmp_file.h"
 #include "modem.h"
 
-#include "FIR/FIR_V22_Minitel.h"
+#include "FIR/band_pass_rx_Filter.h"
+#include "FIR/low_pass_tx_Filter.h"
 
 #include "data/vdt_tests.h"
 
@@ -83,6 +84,18 @@ void audio_out(void *ctx, Uint8 *stream, int len)
 
 	mdm_genWave(mdm, (short*)stream, len/2);
 
+#if 0
+	int i;
+	short * buf;
+
+	buf = (short *)stream;
+	for(i=0;i<len/2;i++)
+	{
+		band_pass_rx_Filter_put(&((app_ctx *)ctx)->rx_fir, (float)buf[i]);
+		buf[i] = (short)band_pass_rx_Filter_get(&((app_ctx *)ctx)->rx_fir);
+	}
+#endif
+
 	mdm_demodulate(mdm, &mdm->demodulators[0],(short *)stream, len/2);
 }
 
@@ -99,13 +112,12 @@ void audio_in(void *ctx, Uint8 *stream, int len)
 		buf = (short *)stream;
 		for(i=0;i<len/2;i++)
 		{
-			FIR_2100_1300_22050_Filter_put(&((app_ctx *)ctx)->fir, buf[i]);
-			buf[i] = FIR_2100_1300_22050_Filter_get(&((app_ctx *)ctx)->fir);
+			band_pass_rx_Filter_put(&((app_ctx *)ctx)->rx_fir, (float)buf[i]);
+			buf[i] = (short)band_pass_rx_Filter_get(&((app_ctx *)ctx)->rx_fir);
 		}
 	}
 
 	mdm_demodulate(mdm, &mdm->demodulators[0],(short *)stream, len/2);
-
 }
 
 Uint32 video_tick(Uint32 interval, void *param)
@@ -162,7 +174,7 @@ Uint32 video_tick(Uint32 interval, void *param)
 
 	if(app->imgcnt > vdt_ctx->framerate * 2 )
 	{
-		
+
 		if(app->indexbuf >= vdt_test_pages_size[app->pageindex] )
 		{
 			if( mdm_is_fifo_empty(&mdm->tx_fifo) )
@@ -179,7 +191,7 @@ Uint32 video_tick(Uint32 interval, void *param)
 		else
 		{
 			unsigned char * ptr;
-			
+
 			ptr = vdt_test_pages[app->pageindex];
 			while( app->indexbuf < vdt_test_pages_size[app->pageindex] )
 			{
@@ -639,7 +651,8 @@ int main(int argc, char* argv[])
 	if(isOption(argc,argv,"mic",NULL)>0)
 	{
 		mic_mode = 1;
-		FIR_2100_1300_22050_Filter_init(&appctx.fir);
+		band_pass_rx_Filter_init(&appctx.rx_fir);
+		appctx.fir_en = 1;
 	}
 
 	if(isOption(argc,argv,"sdl",0)>0)
