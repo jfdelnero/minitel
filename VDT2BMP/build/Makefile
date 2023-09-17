@@ -33,9 +33,9 @@ EXEC=vdt2bmp
 
 ifeq ($(EMSCRIPTEN), 1)
 	CC=emcc
-	CFLAGS=-O3 $(INCLUDES) -Wall -DSDL_SUPPORT -DEMSCRIPTEN_SUPPORT -s USE_SDL=2
-	LDFLAGS_WASM=-s EXPORTED_FUNCTIONS="['_malloc','_free','_main']" -s BINARYEN=1 -s BINARYEN_METHOD='native-wasm' -s USE_SDL=2
-	LDFLAGS=-s EXPORTED_FUNCTIONS="['_malloc','_free','_main']" -s WASM=0 -s LEGACY_VM_SUPPORT=1 -s USE_SDL=2
+	CFLAGS=-O2 $(INCLUDES) -Wall -DSDL_SUPPORT -DEMSCRIPTEN_SUPPORT -s USE_SDL=2
+	LDFLAGS_WASM=-s EXPORTED_FUNCTIONS="['_malloc','_free','_main']" -s ASYNCIFY -s BINARYEN=1 -s BINARYEN_METHOD='native-wasm' -s USE_SDL=2
+	LDFLAGS=-s EXPORTED_FUNCTIONS="['_malloc','_free','_main']" -s ASYNCIFY -s WASM=0 -s LEGACY_VM_SUPPORT=1 -s USE_SDL=2
 	EXEC=vdt2bmp_asmjs.js vdt2bmp_wasm.js
 endif
 
