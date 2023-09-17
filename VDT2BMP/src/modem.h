@@ -36,6 +36,8 @@
 
 #define SERIAL_FIFO_SIZE 1024
 
+#define DEFAULT_SOUND_BUFFER_SIZE 2048
+
 typedef struct serial_fifo_
 {
 	int in_ptr;

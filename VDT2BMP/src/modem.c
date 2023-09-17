@@ -610,11 +610,15 @@ void mdm_init(modem_ctx *mdm)
 			mdm->demodulators[0].mean[i].mean_max_idx = (int)((float)((mdm->sample_rate / mdm->baud_rate)) * 0.75);
 		}
 
-		mdm->wave_buf = malloc(1024 * sizeof(short));
-		if(mdm->wave_buf )
+		mdm->wave_size = DEFAULT_SOUND_BUFFER_SIZE;
+		mdm->wave_buf = malloc(mdm->wave_size * sizeof(short));
+		if( mdm->wave_buf )
 		{
-			mdm->wave_size = 1024;
 			memset(mdm->wave_buf,0, mdm->wave_size * sizeof(short));
+		}
+		else
+		{
+			mdm->wave_size = 0;
 		}
 	}
 }
