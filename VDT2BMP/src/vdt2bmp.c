@@ -617,7 +617,6 @@ int main(int argc, char* argv[])
 
 #ifdef SDL_SUPPORT
 	SDL_AudioSpec fmt;
-
 #endif
 
 	vdt_ctx = NULL;
@@ -646,8 +645,6 @@ int main(int argc, char* argv[])
 		outmode = OUTPUT_MODE_STDOUT;
 	}
 
-#ifdef SDL_SUPPORT
-
 	if(isOption(argc,argv,"mic",NULL)>0)
 	{
 		mic_mode = 1;
@@ -657,6 +654,7 @@ int main(int argc, char* argv[])
 
 	if(isOption(argc,argv,"sdl",0)>0)
 	{
+#ifdef SDL_SUPPORT
 		outmode = OUTPUT_MODE_SDL;
 		vdt_ctx = vdt_init();
 
@@ -708,8 +706,10 @@ int main(int argc, char* argv[])
 			appctx.timer = SDL_AddTimer(30, video_tick, &appctx);
 			#endif
 		}
-	}
+#else
+		fprintf(stderr, "ERROR : No built-in SDL support !\n");	
 #endif
+	}
 
 	// help option...
 	if(isOption(argc,argv,"help",0)>0)
