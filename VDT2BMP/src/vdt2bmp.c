@@ -667,7 +667,18 @@ int main(int argc, char* argv[])
 			appctx.keystate = SDL_GetKeyboardState(NULL);
 
 			appctx.window = SDL_CreateWindow( "Minitel", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, vdt_ctx->bmp_res_x, vdt_ctx->bmp_res_y, SDL_WINDOW_SHOWN );
+			if(!appctx.window)
+			{
+				fprintf(stderr, "ERROR : SDL_CreateWindow - %s\n",SDL_GetError());
+				return -1;
+			}
+
 			appctx.screen = SDL_GetWindowSurface( appctx.window );
+			if(!appctx.screen)
+			{
+				fprintf(stderr, "ERROR : SDL_GetWindowSurface - %s\n",SDL_GetError());
+				return -1;
+			}
 
 			appctx.mdm = &mdm_ctx;
 			appctx.vdt_ctx = vdt_ctx;
@@ -681,6 +692,7 @@ int main(int argc, char* argv[])
 				}
 			}
 
+			memset(&fmt,0,sizeof(fmt));
 			fmt.freq = mdm_ctx.sample_rate;
 			fmt.format = AUDIO_S16;
 			fmt.channels = 1;
@@ -707,7 +719,7 @@ int main(int argc, char* argv[])
 			#endif
 		}
 #else
-		fprintf(stderr, "ERROR : No built-in SDL support !\n");	
+		fprintf(stderr, "ERROR : No built-in SDL support !\n");
 #endif
 	}
 
@@ -777,7 +789,7 @@ int main(int argc, char* argv[])
 
 				#ifdef EMSCRIPTEN_SUPPORT
 
-				emscripten_set_main_loop_arg(emscripten_vid_callback, &appctx, 30, 0);
+				emscripten_set_main_loop_arg(emscripten_vid_callback, &appctx, 30, 1);
 
 				while(1)
 				{
