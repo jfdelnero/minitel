@@ -8,19 +8,19 @@ FIR filter designed with
 
 sampling frequency: 22050 Hz
 
-* 0 Hz - 500 Hz
+* 0 Hz - 550 Hz
   gain = 1
   desired ripple = 5 dB
-  actual ripple = 4.094471715389378 dB
+  actual ripple = 3.820014374338185 dB
 
-* 800 Hz - 11025 Hz
+* 950 Hz - 11025 Hz
   gain = 0
   desired attenuation = -40 dB
-  actual attenuation = -40.1648650547779 dB
+  actual attenuation = -40.74717682991265 dB
 
 */
 
-#define LOW_PASS_TX_FILTER_TAP_NUM 79
+#define LOW_PASS_TX_FILTER_TAP_NUM 65
 
 typedef struct {
   float history[LOW_PASS_TX_FILTER_TAP_NUM];
@@ -32,3 +32,4 @@ void low_pass_tx_Filter_put(low_pass_tx_Filter* f, float input);
 float low_pass_tx_Filter_get(low_pass_tx_Filter* f);
 
 #endif
+
