@@ -13,6 +13,8 @@ typedef struct bitmap_data_
 	uint32_t  * data;
 }bitmap_data;
 
+#ifndef WIN32
+
 typedef struct tagBITMAPFILEHEADER {
 	uint16_t   bfType;
 	uint32_t   bfSize;
@@ -41,6 +43,8 @@ typedef struct tagRGBQUAD {
 	uint8_t rgbRed;
 	uint8_t rgbReserved;
 } RGBQUAD;
+
+#endif
 
 #pragma pack()
 

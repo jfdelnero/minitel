@@ -30,6 +30,10 @@
 
 #include <stdint.h>
 
+#ifdef WIN32
+#include <windows.h>
+#endif
+
 #include "bmp_file.h"
 
 int bmp_load(char * file,bitmap_data * bdata)
