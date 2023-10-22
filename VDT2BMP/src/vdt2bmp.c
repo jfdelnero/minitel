@@ -47,6 +47,14 @@ Available command line options :
 
 #include <math.h>
 
+#include <errno.h>
+#include <sys/time.h>
+#include <pthread.h>
+
+#ifdef WIN32
+#include <windows.h>
+#endif
+
 #ifdef SDL_SUPPORT
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_audio.h>
@@ -54,6 +62,8 @@ Available command line options :
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include <emscripten/threading.h>
+#include <atomic_arch.h>
 #endif
 
 #include "cache.h"
@@ -72,9 +82,104 @@ Available command line options :
 
 #ifdef SDL_SUPPORT
 
+#ifdef DBG_INJECT_SND
+FILE * indbgfile;
+FILE * outdbgfile;
+#endif
+
+EVENT_HANDLE * createevent()
+{
+	EVENT_HANDLE* theevent;
+	theevent=(EVENT_HANDLE*)malloc(sizeof(EVENT_HANDLE));
+#ifdef EMSCRIPTEN_SUPPORT
+	emscripten_atomic_store_u32(&theevent->futex, 0);
+#else
+	pthread_mutex_init(&theevent->eMutex, NULL);
+	pthread_cond_init(&theevent->eCondVar, NULL);
+#endif
+	return theevent;
+}
+
+void setevent(EVENT_HANDLE * theevent)
+{
+#ifdef EMSCRIPTEN_SUPPORT
+	emscripten_futex_wake(&theevent->futex, 1);
+#else
+	pthread_cond_signal(&theevent->eCondVar);
+#endif
+}
+
+void destroyevent(EVENT_HANDLE * theevent)
+{
+#ifdef EMSCRIPTEN_SUPPORT
+	free(theevent);
+#else
+	pthread_cond_destroy(&theevent->eCondVar);
+	free(theevent);
+#endif
+}
+
+int32_t waitevent(EVENT_HANDLE* theevent,int32_t timeout)
+{
+#ifdef EMSCRIPTEN_SUPPORT
+	emscripten_futex_wait( &theevent->futex, 1,timeout);
+	return 0;
+#else
+	struct timeval now;
+	struct timespec timeoutstr;
+	int32_t retcode;
+
+	pthread_mutex_lock(&theevent->eMutex);
+	gettimeofday(&now,0);
+	timeoutstr.tv_sec = now.tv_sec + (timeout/1000);
+	timeoutstr.tv_nsec = (now.tv_usec * 1000);
+	retcode = 0;
+
+	retcode = pthread_cond_timedwait(&theevent->eCondVar, &theevent->eMutex, &timeoutstr);
+	if (retcode == ETIMEDOUT)
+	{
+		pthread_mutex_unlock(&theevent->eMutex);
+		return 1;
+	}
+	else
+	{
+		pthread_mutex_unlock(&theevent->eMutex);
+		return 0;
+	}
+#endif
+}
+
 //////////////////////////////////////////////////////////////////
 // Audio callbacks
 //////////////////////////////////////////////////////////////////
+
+int push_audio_page(app_ctx * ctx, short * buf)
+{
+	if(
+		( ((ctx->sound_fifo.idx_in+1) & 0xF ) != ( ctx->sound_fifo.idx_out & 0xF ) )
+	)
+	{
+		memcpy((void*)&ctx->sound_fifo.snd_buf[(ctx->sound_fifo.idx_in&0xF) * ctx->sound_fifo.page_size], buf, ctx->sound_fifo.page_size * sizeof(short));
+		ctx->sound_fifo.idx_in = (ctx->sound_fifo.idx_in + 1) & 0xF;
+		return 1;
+	}
+
+	return 0;
+}
+
+int pop_audio_page(app_ctx * ctx, short * buf)
+{
+	if(
+		( ((ctx->sound_fifo.idx_in) & 0xF ) != ( ctx->sound_fifo.idx_out & 0xF ) )
+	)
+	{
+		memcpy((void*)buf,(void*)&ctx->sound_fifo.snd_buf[(ctx->sound_fifo.idx_out&0xF) * ctx->sound_fifo.page_size], ctx->sound_fifo.page_size * sizeof(short) );
+		ctx->sound_fifo.idx_out = (ctx->sound_fifo.idx_out + 1) & 0xF;
+		return 1;
+	}
+
+	return 0;
+}
 
 void audio_out(void *ctx, Uint8 *stream, int len)
 {
@@ -83,6 +188,11 @@ void audio_out(void *ctx, Uint8 *stream, int len)
 	mdm = ((app_ctx *)ctx)->mdm;
 
 	mdm_genWave(mdm, (short*)stream, len/2);
+
+#ifdef DBG_INJECT_SND
+	//if(indbgfile)
+	//	fread(stream,len,1,indbgfile);
+#endif
 
 #if 0
 	int i;
@@ -94,30 +204,106 @@ void audio_out(void *ctx, Uint8 *stream, int len)
 		band_pass_rx_Filter_put(&((app_ctx *)ctx)->rx_fir, (float)buf[i]);
 		buf[i] = (short)band_pass_rx_Filter_get(&((app_ctx *)ctx)->rx_fir);
 	}
+
+#ifdef DBG_INJECT_SND
+	if(outdbgfile)
+		fwrite(buf,len,1,outdbgfile);
+#endif
+
 #endif
 
 	mdm_demodulate(mdm, &mdm->demodulators[0],(short *)stream, len/2);
+	//memset(stream,0,len);
 }
 
 void audio_in(void *ctx, Uint8 *stream, int len)
 {
-	int i;
-	modem_ctx *mdm;
+	setevent(((app_ctx *)ctx)->snd_event);
+
+#ifdef DBG_INJECT_SND
+	if(indbgfile)
+		fread(stream,len,1,indbgfile);
+#endif
+
+	push_audio_page((app_ctx *)ctx, (short *)stream);
+
+}
+
+void * AudioInThreadProc( void *lpParameter )
+{
+	app_ctx * ctx;
 	short * buf;
+	modem_ctx *mdm;
 
-	mdm = ((app_ctx *)ctx)->mdm;
+	ctx = (app_ctx *)lpParameter;
+	mdm = ctx->mdm;
 
-	if(((app_ctx *)ctx)->fir_en)
+	buf = malloc(ctx->sound_fifo.page_size * sizeof(short) );
+
+	while(1)
 	{
-		buf = (short *)stream;
-		for(i=0;i<len/2;i++)
+		waitevent(ctx->snd_event,1000);
+
+		if(pop_audio_page(ctx, buf))
 		{
-			band_pass_rx_Filter_put(&((app_ctx *)ctx)->rx_fir, (float)buf[i]);
-			buf[i] = (short)band_pass_rx_Filter_get(&((app_ctx *)ctx)->rx_fir);
+			if(ctx->uplink)
+			{
+				int i;
+
+				for(i=0;i<ctx->sound_fifo.page_size;i++)
+				{
+					low_pass_tx_Filter_put(&((app_ctx *)ctx)->tx_fir, (float)buf[i]);
+					buf[i] = (short)low_pass_tx_Filter_get(&((app_ctx *)ctx)->tx_fir);
+				}
+
+#ifdef DBG_INJECT_SND
+				//if(outdbgfile)
+				//	fwrite(buf,ctx->sound_fifo.page_size*2,1,outdbgfile);
+#endif
+
+				mdm_demodulate(mdm, &mdm->demodulators[1],(short *)buf, ctx->sound_fifo.page_size);
+			}
+			else
+			{
+				mdm_demodulate(mdm, &mdm->demodulators[0],(short *)buf, ctx->sound_fifo.page_size);
+			}
 		}
+#ifdef EMSCRIPTEN_SUPPORT
+		else
+		{
+			emscripten_atomic_store_u32(&ctx->snd_event->futex, 0);
+		}
+#endif
 	}
 
-	mdm_demodulate(mdm, &mdm->demodulators[0],(short *)stream, len/2);
+	return 0;
+}
+
+int32_t create_audioin_thread(app_ctx * ctx)
+{
+	uint32_t sit;
+	pthread_t threadid;
+	pthread_attr_t threadattrib;
+	int ret;
+
+	sit = 0;
+
+	//pthread_attr_create(&threadattrib);
+	pthread_attr_init(&threadattrib);
+	pthread_attr_setinheritsched(&threadattrib,PTHREAD_EXPLICIT_SCHED);
+
+	pthread_attr_setschedpolicy(&threadattrib,SCHED_FIFO);
+	/* set the new scheduling param */
+	//pthread_attr_setschedparam (&threadattrib, &param);
+
+	ret = pthread_create(&threadid,0,AudioInThreadProc, ctx);
+	if(ret)
+	{
+	#ifdef DEBUG
+		printf("create_audioin_thread : pthread_create failed -> %d",ret);
+	#endif
+	}
+	return sit;
 }
 
 Uint32 video_tick(Uint32 interval, void *param)
@@ -321,7 +507,7 @@ int update_frame(videotex_ctx * vdt_ctx,modem_ctx *mdm, bitmap_data * bmp)
 {
 	unsigned char byte;
 
-	while(mdm_pop_from_fifo(&mdm->rx_fifo, &byte))
+	while(mdm_pop_from_fifo(&mdm->rx_fifo[0], &byte))
 	{
 		vdt_push_char( vdt_ctx, byte );
 	}
@@ -617,6 +803,7 @@ int main(int argc, char* argv[])
 
 #ifdef SDL_SUPPORT
 	SDL_AudioSpec fmt;
+	SDL_AudioSpec fmt_up;
 #endif
 
 	vdt_ctx = NULL;
@@ -624,6 +811,14 @@ int main(int argc, char* argv[])
 	outmode = OUTPUT_MODE_FILE;
 	framerate = 30.0;
 	mic_mode = 0;
+
+#ifdef DBG_INJECT_SND
+	indbgfile = NULL;
+	outdbgfile = NULL;
+
+	//indbgfile = fopen("minitel_test2.wav", "rb");
+	//outdbgfile = fopen("minitel_test_out.raw", "wb");
+#endif
 
 	fprintf(stderr,"Minitel VDT to BMP converter v1.2.0.0\n");
 	fprintf(stderr,"Copyright (C) 2022-2023 Jean-Francois DEL NERO\n");
@@ -650,6 +845,20 @@ int main(int argc, char* argv[])
 		mic_mode = 1;
 		band_pass_rx_Filter_init(&appctx.rx_fir);
 		appctx.fir_en = 1;
+	}
+
+	if(isOption(argc,argv,"server",0)>0)
+	{
+#ifdef SDL_SUPPORT
+		SDL_Init(SDL_INIT_EVERYTHING);
+
+		mdm_init(&mdm_ctx);
+
+		appctx.keystate = SDL_GetKeyboardState(NULL);
+
+#else
+		fprintf(stderr, "ERROR : No built-in SDL support !\n");
+#endif
 	}
 
 	if(isOption(argc,argv,"sdl",0)>0)
@@ -703,6 +912,31 @@ int main(int argc, char* argv[])
 				fmt.callback = audio_out;
 
 			fmt.userdata = &appctx;
+
+
+			if(isOption(argc,argv,"uplink",NULL)>0)
+			{
+				memset(&fmt_up,0,sizeof(fmt));
+				fmt_up.freq = mdm_ctx.sample_rate;
+				fmt_up.format = AUDIO_S16;
+				fmt_up.channels = 1;
+				fmt_up.samples = mdm_ctx.wave_size;
+				fmt_up.callback = audio_in;
+				fmt_up.userdata = &appctx;
+
+				appctx.audio_id_uplink = SDL_OpenAudioDevice(NULL, 1, &fmt_up, &fmt_up, 0);
+				if ( appctx.audio_id_uplink < 0 )
+				{
+					fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
+				}
+				else
+				{
+					SDL_PauseAudioDevice( appctx.audio_id_uplink, SDL_FALSE );
+				}
+
+				low_pass_tx_Filter_init(&appctx.tx_fir);
+
+			}
 
 			appctx.audio_id = SDL_OpenAudioDevice(NULL, mic_mode, &fmt, &fmt, 0);
 			if ( appctx.audio_id < 0 )
@@ -762,6 +996,12 @@ int main(int argc, char* argv[])
 	}
 
 	// Animation generator
+	if(isOption(argc,argv,"uplink",NULL)>0)
+	{
+		appctx.uplink = 1;
+	}
+
+	// Animation generator
 	if(isOption(argc,argv,"ani",NULL)>0)
 	{
 		mdm_init(&mdm_ctx);
@@ -785,6 +1025,19 @@ int main(int argc, char* argv[])
 
 				#ifndef EMSCRIPTEN_SUPPORT
 				remove(DEFAULT_SOUND_FILE);
+				#endif
+
+				#ifdef SDL_SUPPORT
+				if(appctx.uplink)
+				{
+					appctx.snd_event = createevent();
+
+					appctx.sound_fifo.page_size = DEFAULT_SOUND_BUFFER_SIZE;
+					appctx.sound_fifo.snd_buf = malloc( appctx.sound_fifo.page_size * 16 * sizeof(short) );
+					memset((void*)appctx.sound_fifo.snd_buf,0,appctx.sound_fifo.page_size * 16 * sizeof(short));
+
+					create_audioin_thread(&appctx);
+				}
 				#endif
 
 				#ifdef EMSCRIPTEN_SUPPORT
@@ -820,6 +1073,17 @@ int main(int argc, char* argv[])
 			}
 			else
 			{
+
+#ifdef SDL_SUPPORT
+				appctx.snd_event = createevent();
+
+				appctx.sound_fifo.page_size = DEFAULT_SOUND_BUFFER_SIZE;
+				appctx.sound_fifo.snd_buf = malloc( appctx.sound_fifo.page_size * 16 * sizeof(short) );
+				memset((void*)appctx.sound_fifo.snd_buf,0,appctx.sound_fifo.page_size * 16 * sizeof(short));
+
+				create_audioin_thread(&appctx);
+#endif
+
 				#ifdef EMSCRIPTEN_SUPPORT
 				emscripten_set_main_loop_arg(emscripten_vid_callback, &appctx, 30, 1);
 				#endif
@@ -853,6 +1117,13 @@ int main(int argc, char* argv[])
 		SDL_PauseAudioDevice( appctx.audio_id, SDL_TRUE );
 
 		SDL_CloseAudioDevice( appctx.audio_id );
+
+		if(appctx.uplink)
+		{
+			SDL_PauseAudioDevice( appctx.audio_id_uplink, SDL_TRUE );
+
+			SDL_CloseAudioDevice( appctx.audio_id_uplink );
+		}
 	}
 	SDL_Quit();
 #endif

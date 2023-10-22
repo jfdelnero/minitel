@@ -25,6 +25,23 @@
 //
 */
 
+#ifdef SDL_SUPPORT
+typedef struct _EVENT_HANDLE{
+	pthread_cond_t eCondVar;
+	pthread_mutex_t eMutex;
+	int iVar;
+	uint32_t futex;
+} EVENT_HANDLE;
+
+typedef struct snd_fifo_
+{
+	short * snd_buf;
+	int idx_in;
+	int idx_out;
+	int page_size;
+}snd_fifo;
+#endif
+
 typedef struct app_ctx_
 {
 	videotex_ctx * vdt_ctx;
@@ -32,6 +49,7 @@ typedef struct app_ctx_
 	int verbose;
 	int quit;
 	int fir_en;
+	int uplink;
 	low_pass_tx_Filter tx_fir;
 	band_pass_rx_Filter rx_fir;
 #ifdef SDL_SUPPORT
@@ -40,6 +58,9 @@ typedef struct app_ctx_
 	SDL_Window* window;
 	const unsigned char * keystate;
 	int audio_id;
+	int audio_id_uplink;
+	EVENT_HANDLE * snd_event;
+	snd_fifo sound_fifo;
 #endif
 
 	int indexbuf;
