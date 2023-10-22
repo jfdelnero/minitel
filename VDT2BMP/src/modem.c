@@ -27,6 +27,10 @@
 
 /*
  FSK Modem
+
+ Modulation and demodulation support.
+ Full duplex UART support
+
  (C) 2022-2O23 Jean-François DEL NERO
 */
 
@@ -110,6 +114,7 @@ int mdm_prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte)
 	int tx_buffer_size;
 
 	tx_buffer_size = mdm->serial_pre_idle + mdm->serial_nbstart +  mdm->serial_nbits + mdm->serial_nbstop + mdm->serial_post_idle;
+
 	if(mdm->serial_parity)
 		tx_buffer_size++;
 
@@ -179,7 +184,7 @@ int mdm_prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte)
 			break;
 
 			case 2: // even
-				tx_buffer[j++] = (one_bits & 1)^1;
+				tx_buffer[j++] = (one_bits & 1) ^ 1;
 			break;
 		}
 	}
@@ -251,28 +256,29 @@ int mdm_pop_from_fifo(serial_fifo *fifo, unsigned char * c)
 	return ret;
 }
 
-int mdm_serial_rx(modem_ctx *mdm, int state)
+int mdm_serial_rx(modem_ctx *mdm, serial_rx_ctx * rx_ctx, int state)
 {
 	unsigned char mask;
 
-	if(mdm->serial_rx_delay)
+	if(rx_ctx->serial_rx_delay)
 	{
-		mdm->serial_rx_delay--;
-		mdm->serial_rx_prev_state = state;
+		rx_ctx->serial_rx_delay--;
+		rx_ctx->serial_rx_prev_state = state;
+
 		return 0;
 	}
 
-	switch(mdm->serial_rx_state)
+	switch(rx_ctx->serial_rx_state)
 	{
 		case 0: // Wait start bit
-			if(!state && mdm->serial_rx_prev_state)
+			if(!state && rx_ctx->serial_rx_prev_state)
 			{
-				mdm->serial_rx_delay = mdm->bit_time + (mdm->bit_time/2);
-				mdm->serial_rx_shiftreg = 0x0000;
-				mdm->serial_rx_parbitcnt = 0;
-				mdm->serial_rx_cnt = 0;
+				rx_ctx->serial_rx_delay = rx_ctx->bit_time + (rx_ctx->bit_time/2);
+				rx_ctx->serial_rx_shiftreg = 0x0000;
+				rx_ctx->serial_rx_parbitcnt = 0;
+				rx_ctx->serial_rx_cnt = 0;
 
-				mdm->serial_rx_state = 1;
+				rx_ctx->serial_rx_state = 1;
 			}
 		break;
 		case 1: // Rx Shift
@@ -280,24 +286,24 @@ int mdm_serial_rx(modem_ctx *mdm, int state)
 
 			if(state)
 			{
-				mdm->serial_rx_shiftreg |= (mask << mdm->serial_rx_cnt);
-				mdm->serial_rx_parbitcnt++;
+				rx_ctx->serial_rx_shiftreg |= (mask << rx_ctx->serial_rx_cnt);
+				rx_ctx->serial_rx_parbitcnt++;
 			}
 
-			mdm->serial_rx_cnt++;
-			if(mdm->serial_rx_cnt == mdm->serial_nbits)
+			rx_ctx->serial_rx_cnt++;
+			if(rx_ctx->serial_rx_cnt == mdm->serial_nbits)
 			{
-				mdm->serial_rx_state = 2;
+				rx_ctx->serial_rx_state = 2;
 			}
 
-			mdm->serial_rx_delay = mdm->bit_time;
+			rx_ctx->serial_rx_delay = rx_ctx->bit_time;
 		break;
 
 		case 2: // Parity
 			switch(mdm->serial_parity)
 			{
 				case 1: // odd
-					if( (mdm->serial_rx_parbitcnt & 1)  != (state&1) )
+					if( (rx_ctx->serial_rx_parbitcnt & 1)  != (state&1) )
 					{
 						// bad parity
 #if 0
@@ -307,7 +313,7 @@ int mdm_serial_rx(modem_ctx *mdm, int state)
 				break;
 
 				case 2: // even
-					if( (mdm->serial_rx_parbitcnt & 1)  != ((state^1)&1) )
+					if( (rx_ctx->serial_rx_parbitcnt & 1)  != ((state^1)&1) )
 					{
 						// bad parity
 #if 0
@@ -315,31 +321,38 @@ int mdm_serial_rx(modem_ctx *mdm, int state)
 #endif
 					}
 				break;
+
+				default:
+				break;
 			}
 
-			mdm->serial_rx_state = 3;
-			mdm->serial_rx_delay = mdm->bit_time;
+			rx_ctx->serial_rx_state = 3;
+			rx_ctx->serial_rx_delay = rx_ctx->bit_time;
 		break;
 
 		case 3: // Stop bit
-			mdm->serial_rx_state = 0;
-			mdm->serial_rx_delay = 0;
+			rx_ctx->serial_rx_state = 0;
+			rx_ctx->serial_rx_delay = 0;
 
-			if( !mdm_push_to_fifo(&mdm->rx_fifo, mdm->serial_rx_shiftreg) )
+			if( rx_ctx->fifo_idx == 1 )
+			{
+				printf("Rx byte : 0x%.2X %c\n",rx_ctx->serial_rx_shiftreg, rx_ctx->serial_rx_shiftreg&0x7F);
+			}
+
+			if( !mdm_push_to_fifo(&mdm->rx_fifo[rx_ctx->fifo_idx], rx_ctx->serial_rx_shiftreg) )
 			{
 				printf("RX Fifo full !\n");
 			}
 
 #if 0
-			printf("RX : 0x%.2X\n",mdm->serial_rx_shiftreg);
+			printf("RX : 0x%.2X\n",rx_ctx->serial_rx_shiftreg);
 #endif
 		break;
 	}
 
-	mdm->serial_rx_prev_state = state;
+	rx_ctx->serial_rx_prev_state = state;
 
 	return 0;
-
 }
 
 int mdm_genWave(modem_ctx *mdm, short * buf, int size)
@@ -432,13 +445,13 @@ int mdm_genWave(modem_ctx *mdm, short * buf, int size)
 // (Implemented)
 //                          _____         _________        _________
 //                         |     |       |         |      |         |
-//           |------------>| MUL |------>|   AVG   |----->|   ^2    |------|
+//           |------------>| MUL |------>|   AVG   |----->|   ^2    |------\
 //           |             |_____|       |_________|      |_________|   ___v__
 //           |                 ^SIN                                    |      |
-//           |                 |                                       |  ADD |---------|
+//           |                 |                                       |  ADD |---------\
 //           |       _____     |          _________        _________   |______|         |
 //           |      |     |    |         |         |      |         |      ^            |
-//           |----->| MUL |------------->|   AVG   |----->|   ^2    |------|            |
+//           |----->| MUL |------------->|   AVG   |----->|   ^2    |------/            |
 //           |      |_____|    |         |_________|      |_________|                   |
 //           |        ^COS     |                                                        |
 //           |        |        |                                                        |
@@ -453,13 +466,13 @@ int mdm_genWave(modem_ctx *mdm, short * buf, int size)
 //           |                                                                          |
 //           |              _____         _________        _________                    |
 //           |             |     |       |         |      |         |                   |
-//           |------------>| MUL |------>|   AVG   |----->|   ^2    |------|            |
+//           |------------>| MUL |------>|   AVG   |----->|   ^2    |------\            |
 //           |             |_____|       |_________|      |_________|   ___v__          |
 //           |                 ^SIN                                    |      |         |
-//           |                 |                                       |  ADD |---------|
+//           |                 |                                       |  ADD |---------/
 //           |       _____     |          _________        _________   |______|
 //           |      |     |    |         |         |      |         |      ^
-//           |----->| MUL |------------->|   AVG   |----->|   ^2    |------|
+//           |----->| MUL |------------->|   AVG   |----->|   ^2    |------/
 //                  |_____|    |         |_________|      |_________|
 //                    ^COS     |
 //                    |        |
@@ -521,7 +534,7 @@ void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wave
 			mul_freq = f1_sincos * (float)(wavebuf[i]/(float)32765);
 
 			// Basic integrator with leak
-			mdm_dmt->old_integrator_res[j] =  (((float)mdm_dmt->old_integrator_res[j]) * 0.9) + mul_freq;
+			mdm_dmt->old_integrator_res[j] = (((float)mdm_dmt->old_integrator_res[j]) * 0.92) + mul_freq;
 
 			// Power computation
 			mdm_dmt->power[j] = mdm_dmt->old_integrator_res[j] * mdm_dmt->old_integrator_res[j];
@@ -555,12 +568,40 @@ void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wave
 			bit = 1;
 
 		// Feed the UART RX input
-		mdm_serial_rx(mdm, bit);
+		mdm_serial_rx(mdm,&mdm->serial_rx[mdm_dmt->uart_rx_idx],bit);
 
 #if 0
-		printf("%f;%f;%f;%f;%f;%f;%f;%d\n",mdm_dmt->power[0],mdm_dmt->power[1],mdm_dmt->power[2],mdm_dmt->power[3],mdm_dmt->add[0],mdm_dmt->add[1],result,bit);
+		if(mdm_dmt->uart_rx_idx == 1)
+			printf("%f;%f;%f;%f;%f;%f;%f;%d\n",mdm_dmt->power[0],mdm_dmt->power[1],mdm_dmt->power[2],mdm_dmt->power[3],mdm_dmt->add[0],mdm_dmt->add[1],result,bit);
 #endif
 	}
+}
+
+void mdm_cfg_demod(modem_ctx *mdm, modem_demodulator_ctx * demod, int baud_rate, int sample_rate, int zero_freq, int one_freq, int rxuart_idx)
+{
+	int i;
+
+	demod->sample_rate = sample_rate;
+	demod->bit_time = (demod->sample_rate / baud_rate);
+
+	demod->uart_rx_idx = rxuart_idx;
+
+	demod->freqs[0] = zero_freq;
+	demod->freqs[1] = one_freq;
+
+	for(i=0;i<2;i++)
+	{
+		demod->mod_step[i] = freq2step(demod->sample_rate, demod->freqs[i] );
+		demod->phase[i] = 0;
+	}
+
+	for(i=0;i<4;i++)
+	{
+		demod->mean[i].mean_max_idx = (int)((float)((demod->sample_rate / one_freq))*0.80);
+	}
+
+	mdm->serial_rx[demod->uart_rx_idx].bit_time = ((float)demod->sample_rate / (float)baud_rate);
+	mdm->serial_rx[demod->uart_rx_idx].fifo_idx = rxuart_idx;
 }
 
 void mdm_init(modem_ctx *mdm)
@@ -588,27 +629,19 @@ void mdm_init(modem_ctx *mdm)
 		{
 			mdm->mod_step[i] = freq2step(mdm->sample_rate, mdm->freqs[i] );
 		}
+
 		mdm->phase = 0;
 
+		// Modulator settings
 		mdm->baud_rate = 1200;
 		mdm->bit_time =  ((float)mdm->sample_rate / (float)mdm->baud_rate);
 		mdm->Amplitude = (int)(32767 * (float)((float)70/100));
 
-		mdm->demodulators[0].sample_rate = DEFAULT_SAMPLERATE;
-		mdm->demodulators[0].bit_time = (mdm->sample_rate / mdm->baud_rate);
+		// Feedback demodulator settings
+		mdm_cfg_demod(mdm, &mdm->demodulators[0], mdm->baud_rate, DEFAULT_SAMPLERATE, 2100, 1300, 0);
 
-		mdm->demodulators[0].freqs[0] = 2100;
-		mdm->demodulators[0].freqs[1] = 1300;
-		for(i=0;i<2;i++)
-		{
-			mdm->demodulators[0].mod_step[i] = freq2step(mdm->demodulators[0].sample_rate, mdm->demodulators[0].freqs[i] );
-			mdm->demodulators[0].phase[i] = 0;
-		}
-
-		for(i=0;i<4;i++)
-		{
-			mdm->demodulators[0].mean[i].mean_max_idx = (int)((float)((mdm->sample_rate / mdm->baud_rate)) * 0.75);
-		}
+		// Downlink demodulator settings (link coming from the minitel)
+		mdm_cfg_demod(mdm, &mdm->demodulators[1], 75, DEFAULT_SAMPLERATE, 450, 390, 1);
 
 		mdm->wave_size = DEFAULT_SOUND_BUFFER_SIZE;
 		mdm->wave_buf = malloc(mdm->wave_size * sizeof(short));

@@ -70,7 +70,23 @@ typedef struct modem_demodulator_ctx_
 
 	int bit_time;
 
+	int uart_rx_idx;
 }modem_demodulator_ctx;
+
+
+typedef struct serial_rx_
+{
+	int serial_rx_delay;
+	int serial_rx_prev_state;
+	int serial_rx_state;
+	unsigned short serial_rx_shiftreg;
+	int serial_rx_parbitcnt;
+	int serial_rx_cnt;
+
+	float bit_time;
+
+	int fifo_idx;
+}serial_rx_ctx;
 
 typedef struct modem_ctx_
 {
@@ -107,19 +123,16 @@ typedef struct modem_ctx_
 
 	modem_demodulator_ctx demodulators[4];
 
-	int serial_rx_delay;
-	int serial_rx_prev_state;
-	int serial_rx_state;
-	unsigned short serial_rx_shiftreg;
-	int serial_rx_parbitcnt;
-	int serial_rx_cnt;
+	serial_rx_ctx serial_rx[2];
+	serial_fifo rx_fifo[2];
 
-	serial_fifo rx_fifo;
 	serial_fifo tx_fifo;
 
 }modem_ctx;
 
 void mdm_init(modem_ctx *mdm);
+
+void mdm_cfg_demod(modem_ctx *mdm, modem_demodulator_ctx * demod, int baud_rate, int sample_rate, int zero_freq, int one_freq, int rxuart_idx);
 
 int  mdm_prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte);
 int  mdm_genWave(modem_ctx *mdm, short * buf, int size);
