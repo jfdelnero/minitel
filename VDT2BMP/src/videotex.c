@@ -903,6 +903,7 @@ void vdt_push_char(videotex_ctx * ctx, unsigned char c)
 	unsigned int i,tmp;
 	unsigned char tmp_char;
 	uint32_t next_decoder_state;
+	int x_tmp, y_tmp;
 
 	ctx->input_bytes_cnt++;
 
@@ -992,12 +993,17 @@ void vdt_push_char(videotex_ctx * ctx, unsigned char c)
 					break;
 					case 0x18:
 						tmp = ctx->current_attributs;
+						x_tmp = ctx->cursor_x_pos;
+						y_tmp = ctx->cursor_y_pos;
+
 						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_FONT_SHIFT, ATTRIBUTS_FONT_MASK, 0x0);
 						ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_UNDERLINE_SHIFT, 0x1, 0x0);
 						ctx->underline_latch = 0;
 						LOG("Clear end off line\n");
 						vdt_fill_line(ctx, ' ');
 						ctx->current_attributs = tmp;
+						ctx->cursor_x_pos = x_tmp;
+						ctx->cursor_y_pos = y_tmp;
 					break;
 					case 0x19:
 						LOG("G2\n");
