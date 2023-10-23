@@ -67,6 +67,8 @@ typedef struct app_ctx_
 	int imgcnt;
 	int pageindex;
 
+	envvar_entry * env;
+
 }app_ctx;
 
 enum {

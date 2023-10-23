@@ -66,6 +66,8 @@ Available command line options :
 #include <atomic_arch.h>
 #endif
 
+#include "env.h"
+
 #include "cache.h"
 #include "videotex.h"
 #include "bmp_file.h"
@@ -77,6 +79,10 @@ Available command line options :
 #include "data/vdt_tests.h"
 
 #include "vdt2bmp.h"
+
+#include "script_exec.h"
+
+#include "version.h"
 
 #define DEFAULT_SOUND_FILE "out_audio.wav"
 
@@ -314,7 +320,6 @@ Uint32 video_tick(Uint32 interval, void *param)
 	modem_ctx *mdm;
 	app_ctx *app;
 	SDL_Surface *sdl_scr;
-	SDL_Event e;
 	int i;
 
 	app = ((app_ctx *)param);
@@ -349,10 +354,6 @@ Uint32 video_tick(Uint32 interval, void *param)
 		SDL_UnlockSurface(sdl_scr);
 
 	SDL_UpdateWindowSurface(app->window);
-
-	SDL_PollEvent(&e);
-	if (e.type == SDL_QUIT)
-		((app_ctx *)param)->quit = 1;
 
 #ifdef EMSCRIPTEN_SUPPORT
 	// Test page loop
@@ -557,6 +558,7 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framera
 	file_cache fc;
 	unsigned char * tmp_buf;
 	unsigned char c;
+	SDL_Event e;
 
 	image_nb = 0;
 	pause_frames_cnt = 0;
@@ -598,7 +600,14 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framera
 					while(!mdm_is_fifo_empty(&mdm->tx_fifo))
 					{
 					}
-					usleep(2000*1000);
+
+					for(i=0;i<2000;i++)
+					{
+						while( SDL_PollEvent(&e) )
+						{
+						}
+						SDL_Delay(1);
+					}
 				break;
 			}
 		}
@@ -640,7 +649,13 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framera
 
 #ifdef SDL_SUPPORT
 				case OUTPUT_MODE_SDL:
-					usleep(10000);
+					for(i=0;i<2000;i++)
+					{
+						while( SDL_PollEvent(&e) )
+						{
+						}
+						SDL_Delay(1);
+					}
 				break;
 #endif
 			}
@@ -787,6 +802,22 @@ alloc_error:
 	return -3;
 }
 
+int SCRIPT_CUI_affiche(void * ctx, int MSGTYPE, char * string, ... )
+{
+	if( MSGTYPE!=MSG_DEBUG )
+	{
+		va_list marker;
+		va_start( marker, string );
+
+		vprintf(string,marker);
+		printf("\n");
+
+		va_end( marker );
+	}
+
+	return 0;
+}
+
 int main(int argc, char* argv[])
 {
 	char filename[512];
@@ -798,8 +829,11 @@ int main(int argc, char* argv[])
 	float framerate;
 	videotex_ctx * vdt_ctx;
 	app_ctx appctx;
+	script_ctx * scriptctx;
 
 	memset(&appctx,0,sizeof(app_ctx));
+
+	appctx.env = setEnvVar(appctx.env, "VERSION", "v"STR_FILE_VERSION2);
 
 #ifdef SDL_SUPPORT
 	SDL_AudioSpec fmt;
@@ -820,7 +854,7 @@ int main(int argc, char* argv[])
 	//outdbgfile = fopen("minitel_test_out.raw", "wb");
 #endif
 
-	fprintf(stderr,"Minitel VDT to BMP converter v1.2.0.0\n");
+	fprintf(stderr,"Minitel VDT to BMP converter v%s\n",STR_FILE_VERSION2);
 	fprintf(stderr,"Copyright (C) 2022-2023 Jean-Francois DEL NERO\n");
 	fprintf(stderr,"This program comes with ABSOLUTELY NO WARRANTY\n");
 	fprintf(stderr,"This is free software, and you are welcome to redistribute it\n");
@@ -847,15 +881,88 @@ int main(int argc, char* argv[])
 		appctx.fir_en = 1;
 	}
 
-	if(isOption(argc,argv,"server",0)>0)
+	if(isOption(argc,argv,"server",(char*)&filename)>0)
 	{
 #ifdef SDL_SUPPORT
 		SDL_Init(SDL_INIT_EVERYTHING);
 
 		mdm_init(&mdm_ctx);
 
+		appctx.mdm = &mdm_ctx;
+
 		appctx.keystate = SDL_GetKeyboardState(NULL);
 
+		if(!(SDL_WasInit(SDL_INIT_AUDIO) & SDL_INIT_AUDIO))
+		{
+			if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
+			{
+				fprintf(stderr, "ERROR : SDL_INIT_AUDIO not initialized !\n");
+				return -1;
+			}
+		}
+
+		memset(&fmt,0,sizeof(fmt));
+		fmt.freq = mdm_ctx.sample_rate;
+		fmt.format = AUDIO_S16;
+		fmt.channels = 1;
+		fmt.samples = mdm_ctx.wave_size;
+		if(mic_mode)
+			fmt.callback = audio_in;
+		else
+			fmt.callback = audio_out;
+
+		fmt.userdata = &appctx;
+
+		if(isOption(argc,argv,"uplink",NULL)>0)
+		{
+			memset(&fmt_up,0,sizeof(fmt));
+			fmt_up.freq = mdm_ctx.sample_rate;
+			fmt_up.format = AUDIO_S16;
+			fmt_up.channels = 1;
+			fmt_up.samples = mdm_ctx.wave_size;
+			fmt_up.callback = audio_in;
+			fmt_up.userdata = &appctx;
+
+			appctx.snd_event = createevent();
+
+			appctx.sound_fifo.page_size = DEFAULT_SOUND_BUFFER_SIZE;
+			appctx.sound_fifo.snd_buf = malloc( appctx.sound_fifo.page_size * 16 * sizeof(short) );
+			memset((void*)appctx.sound_fifo.snd_buf,0,appctx.sound_fifo.page_size * 16 * sizeof(short));
+
+			appctx.audio_id_uplink = SDL_OpenAudioDevice(NULL, 1, &fmt_up, &fmt_up, 0);
+			if ( appctx.audio_id_uplink < 0 )
+			{
+				fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
+			}
+			else
+			{
+				SDL_PauseAudioDevice( appctx.audio_id_uplink, SDL_FALSE );
+			}
+
+			low_pass_tx_Filter_init(&appctx.tx_fir);
+			appctx.uplink = 1;
+
+			create_audioin_thread(&appctx);
+		}
+
+		appctx.audio_id = SDL_OpenAudioDevice(NULL, mic_mode, &fmt, &fmt, 0);
+		if ( appctx.audio_id < 0 )
+		{
+			fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
+		}
+		else
+		{
+			SDL_PauseAudioDevice( appctx.audio_id, SDL_FALSE );
+		}
+
+		scriptctx = init_script((void *)&appctx, 0x00000000, (void*)&appctx.env);
+		if( scriptctx )
+		{
+			setOutputFunc_script( scriptctx, SCRIPT_CUI_affiche );
+			execute_file_script( scriptctx, (char*)&filename );
+
+			deinit_script( scriptctx );
+		}
 #else
 		fprintf(stderr, "ERROR : No built-in SDL support !\n");
 #endif
@@ -1090,7 +1197,7 @@ int main(int argc, char* argv[])
 
 				while( !appctx.quit)
 				{
-					usleep(1000*100);
+					SDL_Delay(1000*100);
 				}
 			}
 

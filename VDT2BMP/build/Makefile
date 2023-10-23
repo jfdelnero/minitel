@@ -81,13 +81,13 @@ endif
 
 all: $(EXEC)
 
-$(EXEC):  vdt2bmp.o videotex.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o band_pass_rx_Filter.o low_pass_tx_Filter.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
+$(EXEC):  vdt2bmp.o videotex.o script_exec.o env.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o band_pass_rx_Filter.o low_pass_tx_Filter.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
 	$(CC) -o $@    $^ $(LDFLAGS)
 
-vdt2bmp_asmjs.js:  vdt2bmp.o videotex.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o band_pass_rx_Filter.o low_pass_tx_Filter.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
+vdt2bmp_asmjs.js:  vdt2bmp.o videotex.o script_exec.o env.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o band_pass_rx_Filter.o low_pass_tx_Filter.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
 	$(CC) -o $@    $^ $(LDFLAGS)
 
-vdt2bmp_wasm.js:  vdt2bmp.o videotex.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o band_pass_rx_Filter.o low_pass_tx_Filter.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
+vdt2bmp_wasm.js:  vdt2bmp.o videotex.o script_exec.o env.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o band_pass_rx_Filter.o low_pass_tx_Filter.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
 	$(CC) -o $@    $^ $(LDFLAGS_WASM)
 
 vdt2bmp.o: ../src/vdt2bmp.c
@@ -109,6 +109,12 @@ teletel_font.o: ../src/teletel_font.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 ef9345_font.o: ../src/ef9345_font.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+script_exec.o: ../src/script_exec.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+env.o: ../src/env.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 FIR_V22_Minitel.o: ../src/FIR/FIR_V22_Minitel.c
