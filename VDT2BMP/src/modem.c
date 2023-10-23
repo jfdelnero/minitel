@@ -256,6 +256,14 @@ int mdm_pop_from_fifo(serial_fifo *fifo, unsigned char * c)
 	return ret;
 }
 
+int mdm_purge_fifo(serial_fifo *fifo)
+{
+	fifo->in_ptr = 0;
+	fifo->out_ptr = 0;
+
+	return 0;
+}
+
 int mdm_serial_rx(modem_ctx *mdm, serial_rx_ctx * rx_ctx, int state)
 {
 	unsigned char mask;
