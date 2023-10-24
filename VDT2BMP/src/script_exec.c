@@ -156,9 +156,23 @@ static int is_variable(char * command)
 
 static int get_next_word(char * line, int offset)
 {
-	while( !is_end_line(line[offset]) && ( line[offset] == ' ' || line[offset] == '\t' ) )
+	int i;
+
+	while( !is_end_line(line[offset]) && ( line[offset] == ' ' || line[offset] == '\t' || line[offset] == 0xEF ) )
 	{
-		offset++;
+		if( line[offset] == 0xEF ) // UTF code
+		{
+			i = 0;
+			while( !is_end_line(line[offset]) && i < 3 )
+			{
+				i++;
+				offset++;
+			}
+		}
+		else
+		{
+			offset++;
+		}
 	}
 
 	return offset;
@@ -212,7 +226,7 @@ static int get_param_offset(char * line, int param)
 
 			offs = get_next_word( line, offs );
 
-			if(line[offs] == 0 || line[offs] == '#' || line[offs] == '\r' || line[offs] == '\n')
+			if( is_end_line(line[offs]) )
 				return -1;
 
 			param_cnt++;
@@ -1384,12 +1398,13 @@ static int cmd_send_file( script_ctx * ctx, char * line)
 					mdm_push_to_fifo( &appctx->mdm->tx_fifo, c);
 					offset++;
 				}
+
+				usleep(1000);
 			}
 
 			close_file(&fc);
 
 			ret = SCRIPT_NO_ERROR;
-
 		}
 		else
 		{
@@ -1449,7 +1464,7 @@ static int cmd_rx_char( script_ctx * ctx, char * line)
 
 	while ( mdm_is_fifo_empty(&appctx->mdm->rx_fifo[1]) )
 	{
-		usleep(1000);
+		usleep(4000);
 	}
 
 	mdm_pop_from_fifo(&appctx->mdm->rx_fifo[1], &c);
@@ -1459,20 +1474,75 @@ static int cmd_rx_char( script_ctx * ctx, char * line)
 	return SCRIPT_NO_ERROR;
 }
 
+static int cmd_rx_carrier( script_ctx * ctx, char * line)
+{
+	app_ctx * appctx;
+	appctx = (app_ctx *)ctx->app_ctx;
+
+	if( mdm_is_carrier_present( appctx->mdm, &appctx->mdm->demodulators[1] ) )
+		return SCRIPT_TRUE;
+	else
+		return SCRIPT_FALSE;
+}
+
 static int cmd_tx( script_ctx * ctx, char * line)
 {
 	app_ctx * appctx;
 	appctx = (app_ctx *)ctx->app_ctx;
 	char send_buf[DEFAULT_BUFLEN];
 	int i=0, size;
+	unsigned int val;
 
-	i = get_param( ctx, line, 1, send_buf );
+	i = get_param_str( ctx, line, 1, send_buf );
 
 	if( i>=0 )
 	{
-		size = strlen (send_buf);
+		size = 0;
 
-		for(i=0;i<size;i++)
+		if(send_buf[0] == 's' && send_buf[1] == ':')
+		{
+			i = 2;
+			size = strlen(&send_buf[2]);
+		}
+
+		if(send_buf[0] == 'c' && send_buf[1] == ':')
+		{
+			val = get_script_variable( ctx, &send_buf[2]);
+
+			size = 1;
+			send_buf[2] = ( val ) & 0xFF;
+
+			if( val > 0xFF)
+			{
+				send_buf[2] = (val >> 8) & 0xFF;
+				send_buf[3] = ( val ) & 0xFF;
+
+				size = 2;
+			}
+
+			if( val > 0xFFFF)
+			{
+				send_buf[2] = (val >> 16) & 0xFF;
+				send_buf[3] = (val >> 8) & 0xFF;
+				send_buf[4] = ( val ) & 0xFF;
+
+				size = 3;
+			}
+
+			if( val > 0xFFFFFF)
+			{
+				send_buf[2] = (val >> 24) & 0xFF;
+				send_buf[3] = (val >> 16) & 0xFF;
+				send_buf[4] = (val >> 8) & 0xFF;
+				send_buf[5] = ( val ) & 0xFF;
+
+				size = 4;
+			}
+
+			i = 2;
+		}
+
+		for(;i<size+2;i++)
 		{
 			while ( mdm_is_fifo_full(&appctx->mdm->tx_fifo) )
 			{
@@ -1515,6 +1585,7 @@ cmd_list script_commands_list[] =
 	{"purge_tx_buffer",         cmd_purge_tx_buffer},
 	{"rx_char",                 cmd_rx_char},
 	{"tx",                      cmd_tx},
+	{"rx_carrier_present",      cmd_rx_carrier},
 
 	{ 0, 0 }
 };
