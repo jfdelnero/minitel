@@ -885,13 +885,32 @@ int main(int argc, char* argv[])
 	{
 #ifdef SDL_SUPPORT
 		SDL_Init(SDL_INIT_EVERYTHING);
-
-		mdm_init(&mdm_ctx);
-
-		appctx.mdm = &mdm_ctx;
-
 		appctx.keystate = SDL_GetKeyboardState(NULL);
 
+		outmode = OUTPUT_MODE_SDL;
+
+		vdt_ctx = vdt_init();
+		appctx.vdt_ctx = vdt_ctx;
+
+		vdt_load_charset(vdt_ctx, NULL);
+
+		mdm_init(&mdm_ctx);
+		appctx.mdm = &mdm_ctx;
+
+		appctx.window = SDL_CreateWindow( "Minitel", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, vdt_ctx->bmp_res_x, vdt_ctx->bmp_res_y, SDL_WINDOW_SHOWN );
+		if(!appctx.window)
+		{
+			fprintf(stderr, "ERROR : SDL_CreateWindow - %s\n",SDL_GetError());
+			return -1;
+		}
+
+		appctx.screen = SDL_GetWindowSurface( appctx.window );
+		if(!appctx.screen)
+		{
+			fprintf(stderr, "ERROR : SDL_GetWindowSurface - %s\n",SDL_GetError());
+			return -1;
+		}
+		
 		if(!(SDL_WasInit(SDL_INIT_AUDIO) & SDL_INIT_AUDIO))
 		{
 			if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
@@ -954,6 +973,8 @@ int main(int argc, char* argv[])
 		{
 			SDL_PauseAudioDevice( appctx.audio_id, SDL_FALSE );
 		}
+
+		appctx.timer = SDL_AddTimer(30, video_tick, &appctx);
 
 		scriptctx = init_script((void *)&appctx, 0x00000000, (void*)&appctx.env);
 		if( scriptctx )
