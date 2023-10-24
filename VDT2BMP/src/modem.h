@@ -71,6 +71,8 @@ typedef struct modem_demodulator_ctx_
 	int bit_time;
 
 	int uart_rx_idx;
+
+	int carrier_detect;
 }modem_demodulator_ctx;
 
 typedef struct serial_rx_
@@ -142,5 +144,7 @@ int  mdm_is_fifo_full(serial_fifo *fifo);
 int  mdm_push_to_fifo(serial_fifo *fifo, unsigned char c);
 int  mdm_pop_from_fifo(serial_fifo *fifo, unsigned char * c);
 int  mdm_purge_fifo(serial_fifo *fifo);
+
+int  mdm_is_carrier_present(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt);
 
 int  write_wave_file(char* filename,short * wavebuf,int size,int samplerate);

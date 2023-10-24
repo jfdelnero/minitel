@@ -575,6 +575,24 @@ void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wave
 		if(result>=0)
 			bit = 1;
 
+		// Carrier detect
+		if( mdm_dmt->add[0] + mdm_dmt->add[1] > 0.15 )
+		{
+			if( mdm_dmt->carrier_detect < (mdm_dmt->sample_rate / 8) )
+				mdm_dmt->carrier_detect++;
+		}
+		else
+		{
+			mdm_dmt->carrier_detect = (mdm_dmt->carrier_detect * 7) / 8;
+		}
+
+		// Gate the UART input if carrier detect level is under the threshold
+		if( mdm_dmt->carrier_detect < ( ( (mdm_dmt->sample_rate / 8) * 3 ) / 4 ) )
+			bit = 1;
+
+		//if(mdm_dmt->uart_rx_idx == 1)
+		//	printf(">%d\n",mdm_dmt->carrier_detect);
+
 		// Feed the UART RX input
 		mdm_serial_rx(mdm,&mdm->serial_rx[mdm_dmt->uart_rx_idx],bit);
 
@@ -583,6 +601,14 @@ void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wave
 			printf("%f;%f;%f;%f;%f;%f;%f;%d\n",mdm_dmt->power[0],mdm_dmt->power[1],mdm_dmt->power[2],mdm_dmt->power[3],mdm_dmt->add[0],mdm_dmt->add[1],result,bit);
 #endif
 	}
+}
+
+int  mdm_is_carrier_present(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt)
+{
+	if( mdm_dmt->carrier_detect < ( ( (mdm_dmt->sample_rate / 8) * 3 ) / 4 ) )
+		return 0;
+	else
+		return 1;
 }
 
 void mdm_cfg_demod(modem_ctx *mdm, modem_demodulator_ctx * demod, int baud_rate, int sample_rate, int zero_freq, int one_freq, int rxuart_idx)
