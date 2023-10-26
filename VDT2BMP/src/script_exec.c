@@ -1555,6 +1555,255 @@ static int cmd_tx( script_ctx * ctx, char * line)
 	return SCRIPT_NO_ERROR;
 }
 
+unsigned char wait_char(script_ctx * ctx)
+{
+	app_ctx * appctx;
+	appctx = (app_ctx *)ctx->app_ctx;
+	unsigned char c;
+
+	while ( mdm_is_fifo_empty(&appctx->mdm->rx_fifo[1]) )
+	{
+		usleep(4000);
+	}
+
+	mdm_pop_from_fifo(&appctx->mdm->rx_fifo[1], &c);
+
+	return c;
+}
+
+void send_char(script_ctx * ctx, unsigned char c)
+{
+	app_ctx * appctx;
+	appctx = (app_ctx *)ctx->app_ctx;
+
+	while ( mdm_is_fifo_full(&appctx->mdm->tx_fifo) )
+	{
+		usleep(1000);
+	}
+
+	mdm_push_to_fifo(&appctx->mdm->tx_fifo, (unsigned char)c);
+
+	return;
+}
+
+int is_minitel_alphanum(unsigned short code)
+{
+	if(
+		(code >= 'a' && code <='z') ||
+		(code >= 'A' && code <='Z') ||
+		(code >= '0' && code <='9') ||
+		(code == ' ')
+	)
+	{
+		return 1;
+	}
+
+	return 0;
+}
+
+typedef struct edit_area_
+{
+	int x_start_area;
+	int y_start_area;
+	int x_end_area;
+	int y_end_area;
+
+	int row, col;
+
+	int max_len;
+	int cur_len;
+
+	unsigned char * field_buf;
+}edit_area;
+
+static void edit_area_remove_char( script_ctx * ctx, edit_area * area )
+{
+	// Effacement 1 char.
+	if( area->cur_len )
+	{
+		if( area->col )
+		{
+			area->col--;
+			send_char(ctx, 0x1F);
+			send_char(ctx, area->y_start_area + area->row);
+			send_char(ctx, area->x_start_area + area->col);
+			send_char(ctx, '.');
+			send_char(ctx, 0x1F);
+			send_char(ctx, area->y_start_area + area->row);
+			send_char(ctx, area->x_start_area + area->col);
+		}
+		else
+		{
+			if( area->row )
+			{
+				area->row--;
+				area->col = (area->x_end_area - area->x_start_area);
+
+				send_char(ctx, 0x1F);
+				send_char(ctx, area->y_start_area + area->row);
+				send_char(ctx, area->x_start_area + area->col);
+				send_char(ctx, '.');
+				send_char(ctx, 0x1F);
+				send_char(ctx, area->y_start_area + area->row);
+				send_char(ctx, area->x_start_area + area->col);
+			}
+		}
+
+		area->cur_len--;
+		area->field_buf[area->cur_len] = 0;
+
+	}
+
+	return;
+}
+
+static void edit_area_add_char( script_ctx * ctx, edit_area * area, unsigned short code )
+{
+	if( is_minitel_alphanum(code) )
+	{
+		if( area->cur_len < area->max_len )
+		{
+			area->field_buf[area->cur_len++] = code & 0xFF;
+
+			send_char(ctx, code & 0xFF);
+
+			area->col++;
+
+			if( area->col > ((area->x_end_area - area->x_start_area) ) && area->cur_len < area->max_len)
+			{
+				if( area->row < ( (area->y_end_area - area->y_start_area) ) )
+				{
+					area->row++;
+					send_char(ctx, 0x1F);
+					send_char(ctx, area->y_start_area + area->row);
+					send_char(ctx, area->x_start_area);
+				}
+				else
+				{
+					send_char(ctx, 0x1F);
+					send_char(ctx, area->y_end_area);
+					send_char(ctx, area->x_end_area);
+				}
+				area->col = 0;
+			}
+		}
+	}
+}
+
+static int cmd_field_edit( script_ctx * ctx, char * line)
+{
+	app_ctx * appctx;
+	appctx = (app_ctx *)ctx->app_ctx;
+	char tmp_buf[DEFAULT_BUFLEN];
+	envvar_entry * tmp_env;
+	unsigned char field_buf[DEFAULT_BUFLEN];
+	int i=0;
+	unsigned char c;
+	unsigned short code;
+	edit_area area;
+
+	memset(&area,0,sizeof(edit_area));
+
+	// field_edit x_start_area y_start_area x_end_area y_end_area max_string_len
+
+	i = get_param_str( ctx, line, 1, tmp_buf );
+	if(i<0)
+		goto error;
+	area.x_start_area = str_to_int(tmp_buf) + 0x40 + 1;
+
+	i = get_param_str( ctx, line, 2, tmp_buf );
+	if(i<0)
+		goto error;
+	area.y_start_area = str_to_int(tmp_buf) + 0x40;
+
+	i = get_param_str( ctx, line, 3, tmp_buf );
+	if(i<0)
+		goto error;
+	area.x_end_area = str_to_int(tmp_buf) + 0x40 + 1;
+
+	i = get_param_str( ctx, line, 4, tmp_buf );
+	if(i<0)
+		goto error;
+	area.y_end_area = str_to_int(tmp_buf) + 0x40;
+
+	i = get_param_str( ctx, line, 5, tmp_buf );
+	if(i<0)
+		goto error;
+
+	area.max_len = str_to_int(tmp_buf);
+	area.field_buf = (unsigned char *)&field_buf;
+
+	memset(field_buf, 0, sizeof(field_buf));
+
+	// Move the the cursor to the upper left area
+	send_char(ctx, 0x1F);
+	send_char(ctx, area.y_start_area);
+	send_char(ctx, area.x_start_area);
+
+	// Cursor ON
+	send_char(ctx, 0x11);
+
+	while( 1 )
+	{
+		c = wait_char(ctx);
+		code = c;
+		if(c == 0x13)
+		{
+			code <<= 8;
+			code |= wait_char(ctx);
+		}
+
+		switch(code)
+		{
+			case 0x1346: // Sommaire
+				// Retour sommaire
+				return 0x1346;
+			break;
+
+			case 0x1345: // Annulation
+				// Effacement ligne complète
+				while( area.cur_len )
+					edit_area_remove_char( ctx, &area );
+			break;
+
+			case 0x1347: // Correction
+				// Effacement 1 char.
+				edit_area_remove_char( ctx, &area );
+			break;
+
+			case 0x1342: // Retour
+				// Passage champ précédent
+				tmp_env = setEnvVar( *((envvar_entry **)ctx->env), "TXT_AREA", (char*)&field_buf );
+				if(tmp_env)
+					*((envvar_entry **)ctx->env) = tmp_env;
+
+				return 0x1342;
+			break;
+
+			case 0x1341: // Envoi
+			case 0x1348: // Suite
+				tmp_env = setEnvVar( *((envvar_entry **)ctx->env), "TXT_AREA", (char*)&field_buf );
+				if(tmp_env)
+					*((envvar_entry **)ctx->env) = tmp_env;
+
+				// Passage champ suivant
+				return 0x1348;
+			break;
+
+			default:
+				edit_area_add_char( ctx, &area, code );
+			break;
+		}
+	}
+
+	return SCRIPT_NO_ERROR;
+
+error:
+	ctx->script_printf( ctx, MSG_ERROR, "ERROR : field_edit - Bad parameter(s)\nfield_edit x_start_area y_start_area x_end_area y_end_area max_string_len\n");
+
+	return SCRIPT_CMD_BAD_PARAMETER;
+}
+
 ////////////////////////////////////////////////////////////////////////
 ///////////////////// commands/operations //////////////////////////////
 ////////////////////////////////////////////////////////////////////////
@@ -1586,6 +1835,7 @@ cmd_list script_commands_list[] =
 	{"rx_char",                 cmd_rx_char},
 	{"tx",                      cmd_tx},
 	{"rx_carrier_present",      cmd_rx_carrier},
+	{"field_edit",              cmd_field_edit},
 
 	{ 0, 0 }
 };
