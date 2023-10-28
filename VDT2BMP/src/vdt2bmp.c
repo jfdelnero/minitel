@@ -44,7 +44,7 @@ Available command line options :
 #include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
-
+#include <stdarg.h>
 #include <math.h>
 
 #include <errno.h>
@@ -494,13 +494,17 @@ void printhelp(char* argv[])
 	fprintf(stderr,"  -ani\t\t\t\t: generate animation\n");
 	fprintf(stderr,"  -sdl\t\t\t\t: SDL mode\n");
 	fprintf(stderr,"  -mic\t\t\t\t: Use the Microphone/Input line instead of files\n");
+	fprintf(stderr,"  -audio_list\t\t: List the available audio input(s)/output(s)\n");
+	fprintf(stderr,"  -audio_dev:[id]\t\t: select audio input/output to use\n");
 	fprintf(stderr,"  -stdout \t\t\t: stdout mode\n");
 	fprintf(stderr,"  -help \t\t\t: This help\n");
 	fprintf(stderr,"  \nExamples :\n");
-	fprintf(stderr,"  animation: vdt2bmp -ani -fps:30 -stdout /path/*.vdt | ffmpeg -y -f rawvideo -pix_fmt argb -s 320x250 -r 30 -i - -an out_video.mkv\n");
-	fprintf(stderr,"  video + audio merging : ffmpeg -i out_video.mkv -i out_audio.wav -c copy output.mkv\n");
+	fprintf(stderr,"  Animation: vdt2bmp -ani -fps:30 -stdout /path/*.vdt | ffmpeg -y -f rawvideo -pix_fmt argb -s 320x250 -r 30 -i - -an out_video.mkv\n");
+	fprintf(stderr,"  Video + audio merging : ffmpeg -i out_video.mkv -i out_audio.wav -c copy output.mkv\n");
 	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp /path/*.vdt\n");
 	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp:out.bmp /path/videotex.vdt\n");
+	fprintf(stderr,"  Minitel server : vdt2bmp -server:vdt/script.txt -uplink -audio_dev:1 -outfile:inscriptions.csv\n");
+
 	fprintf(stderr,"\n");
 }
 
@@ -558,7 +562,9 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framera
 	file_cache fc;
 	unsigned char * tmp_buf;
 	unsigned char c;
+#ifdef SDL_SUPPORT
 	SDL_Event e;
+#endif
 
 	image_nb = 0;
 	pause_frames_cnt = 0;
@@ -603,10 +609,12 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framera
 
 					for(i=0;i<2000;i++)
 					{
+#ifdef SDL_SUPPORT
 						while( SDL_PollEvent(&e) )
 						{
 						}
 						SDL_Delay(1);
+#endif
 					}
 				break;
 			}
@@ -818,14 +826,33 @@ int SCRIPT_CUI_affiche(void * ctx, int MSGTYPE, char * string, ... )
 	return 0;
 }
 
+const char * audio_id_to_name(int id, int input)
+{
+#ifdef SDL_SUPPORT
+	int num;
+
+	if(id < 0)
+		return NULL;
+
+	num = SDL_GetNumAudioDevices(input);
+
+	if( id >= num)
+		return NULL;
+
+	return SDL_GetAudioDeviceName(id, input);
+#else
+	return NULL;
+#endif
+}
+
 int main(int argc, char* argv[])
 {
 	char filename[512];
 	char ofilename[512];
-	char strtmp[512];
+	char strtmp[1024];
 	modem_ctx mdm_ctx;
 	int pal, outmode;
-	int i,mic_mode;
+	int i,mic_mode,audio_id;
 	float framerate;
 	videotex_ctx * vdt_ctx;
 	app_ctx appctx;
@@ -845,6 +872,7 @@ int main(int argc, char* argv[])
 	outmode = OUTPUT_MODE_FILE;
 	framerate = 30.0;
 	mic_mode = 0;
+	audio_id = -1;
 
 #ifdef DBG_INJECT_SND
 	indbgfile = NULL;
@@ -879,6 +907,40 @@ int main(int argc, char* argv[])
 		mic_mode = 1;
 		band_pass_rx_Filter_init(&appctx.rx_fir);
 		appctx.fir_en = 1;
+	}
+
+	if(isOption(argc,argv,"audio_list",(char*)&strtmp))
+	{
+#ifdef SDL_SUPPORT
+		int i, in_num, out_num;
+		const char * ptr;
+
+		SDL_Init(SDL_INIT_EVERYTHING);
+
+		out_num = SDL_GetNumAudioDevices(0);
+		in_num = SDL_GetNumAudioDevices(1);
+
+		fprintf(stderr,"Number of sound output(s) : %d\n",out_num);
+		for(i=0;i<out_num;i++)
+		{
+			ptr = SDL_GetAudioDeviceName(i, 0);
+			if(ptr)
+				fprintf(stderr,"Out %d : %s\n",i,ptr);
+		}
+
+		fprintf(stderr,"\nNumber of sound input(s) : %d\n",in_num);
+		for(i=0;i<in_num;i++)
+		{
+			ptr = SDL_GetAudioDeviceName(i, 1);
+			if(ptr)
+				fprintf(stderr,"In %d  : %s\n",i,ptr);
+		}
+#endif
+	}
+
+	if(isOption(argc,argv,"audio_dev",(char*)&strtmp))
+	{
+		audio_id = atoi(strtmp);
 	}
 
 	if(isOption(argc,argv,"fps",(char*)&strtmp))
@@ -918,7 +980,7 @@ int main(int argc, char* argv[])
 			fprintf(stderr, "ERROR : SDL_GetWindowSurface - %s\n",SDL_GetError());
 			return -1;
 		}
-		
+
 		if(!(SDL_WasInit(SDL_INIT_AUDIO) & SDL_INIT_AUDIO))
 		{
 			if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
@@ -956,7 +1018,7 @@ int main(int argc, char* argv[])
 			appctx.sound_fifo.snd_buf = malloc( appctx.sound_fifo.page_size * 16 * sizeof(short) );
 			memset((void*)appctx.sound_fifo.snd_buf,0,appctx.sound_fifo.page_size * 16 * sizeof(short));
 
-			appctx.audio_id_uplink = SDL_OpenAudioDevice(NULL, 1, &fmt_up, &fmt_up, 0);
+			appctx.audio_id_uplink = SDL_OpenAudioDevice(audio_id_to_name(audio_id, 1), 1, &fmt_up, &fmt_up, 0);
 			if ( appctx.audio_id_uplink < 0 )
 			{
 				fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
@@ -972,7 +1034,7 @@ int main(int argc, char* argv[])
 			create_audioin_thread(&appctx);
 		}
 
-		appctx.audio_id = SDL_OpenAudioDevice(NULL, mic_mode, &fmt, &fmt, 0);
+		appctx.audio_id = SDL_OpenAudioDevice(audio_id_to_name(audio_id, mic_mode), mic_mode, &fmt, &fmt, 0);
 		if ( appctx.audio_id < 0 )
 		{
 			fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
@@ -988,6 +1050,14 @@ int main(int argc, char* argv[])
 		if( scriptctx )
 		{
 			setOutputFunc_script( scriptctx, SCRIPT_CUI_affiche );
+
+			appctx.env = setEnvVar(appctx.env, "OUTFILE", "default_out.txt");
+
+			if(isOption(argc,argv,"outfile",(char*)&ofilename))
+			{
+				appctx.env = setEnvVar(appctx.env, "OUTFILE", ofilename);
+			}
+
 			execute_file_script( scriptctx, (char*)&filename );
 
 			deinit_script( scriptctx );
@@ -1060,7 +1130,7 @@ int main(int argc, char* argv[])
 				fmt_up.callback = audio_in;
 				fmt_up.userdata = &appctx;
 
-				appctx.audio_id_uplink = SDL_OpenAudioDevice(NULL, 1, &fmt_up, &fmt_up, 0);
+				appctx.audio_id_uplink = SDL_OpenAudioDevice(audio_id_to_name(audio_id, 1), 1, &fmt_up, &fmt_up, 0);
 				if ( appctx.audio_id_uplink < 0 )
 				{
 					fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
@@ -1074,7 +1144,7 @@ int main(int argc, char* argv[])
 
 			}
 
-			appctx.audio_id = SDL_OpenAudioDevice(NULL, mic_mode, &fmt, &fmt, 0);
+			appctx.audio_id = SDL_OpenAudioDevice(audio_id_to_name(audio_id, mic_mode), mic_mode, &fmt, &fmt, 0);
 			if ( appctx.audio_id < 0 )
 			{
 				fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
@@ -1219,7 +1289,9 @@ int main(int argc, char* argv[])
 
 				while( !appctx.quit)
 				{
+#ifdef SDL_SUPPORT
 					SDL_Delay(1000*100);
+#endif
 				}
 			}
 
@@ -1261,6 +1333,8 @@ int main(int argc, char* argv[])
 		(isOption(argc,argv,"vdt",0)<=0)  &&
 		(isOption(argc,argv,"ani",0)<=0)  &&
 		(isOption(argc,argv,"mic",0)<=0)  &&
+		(isOption(argc,argv,"audio_list",0)<=0)  &&
+		(isOption(argc,argv,"server",0)<=0)  &&
 		(isOption(argc,argv,"bmp",0)<=0) )
 	{
 		printhelp(argv);
