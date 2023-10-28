@@ -1901,7 +1901,7 @@ static int cmd_writetocsv( script_ctx * ctx, char * line)
 	FILE * file;
 
 	str[0] = 0;
-	i = get_param( ctx, line, 1, (char*)&tmp_str );
+	i = get_param_strvar( ctx, line, 1, (char*)&tmp_str );
 	if( i >= 0)
 	{
 		file = fopen(tmp_str,"a");
