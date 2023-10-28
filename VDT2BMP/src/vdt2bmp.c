@@ -881,6 +881,13 @@ int main(int argc, char* argv[])
 		appctx.fir_en = 1;
 	}
 
+	if(isOption(argc,argv,"fps",(char*)&strtmp))
+	{
+		framerate = atof(strtmp);
+		if(framerate <= 0)
+			framerate = 30.0;
+	}
+
 	if(isOption(argc,argv,"server",(char*)&filename)>0)
 	{
 #ifdef SDL_SUPPORT
@@ -891,6 +898,7 @@ int main(int argc, char* argv[])
 
 		vdt_ctx = vdt_init();
 		appctx.vdt_ctx = vdt_ctx;
+		vdt_ctx->framerate = framerate;
 
 		vdt_load_charset(vdt_ctx, NULL);
 
@@ -1095,13 +1103,6 @@ int main(int argc, char* argv[])
 
 	// Output file name option
 	strcpy(ofilename,"");
-
-	if(isOption(argc,argv,"fps",(char*)&strtmp))
-	{
-		framerate = atof(strtmp);
-		if(framerate <= 0)
-			framerate = 30.0;
-	}
 
 	if(isOption(argc,argv,"bmp",(char*)&ofilename))
 	{
