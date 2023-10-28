@@ -492,10 +492,11 @@ void printhelp(char* argv[])
 	fprintf(stderr,"Options:\n");
 	fprintf(stderr,"  -bmp[:out_file.bmp] \t\t: generate bmp file(s)\n");
 	fprintf(stderr,"  -ani\t\t\t\t: generate animation\n");
+	fprintf(stderr,"  -server:[script path]\t\t: Server mode\n");
 	fprintf(stderr,"  -sdl\t\t\t\t: SDL mode\n");
 	fprintf(stderr,"  -mic\t\t\t\t: Use the Microphone/Input line instead of files\n");
-	fprintf(stderr,"  -audio_list\t\t: List the available audio input(s)/output(s)\n");
-	fprintf(stderr,"  -audio_dev:[id]\t\t: select audio input/output to use\n");
+	fprintf(stderr,"  -audio_list\t\t\t: List the available audio input(s)/output(s)\n");
+	fprintf(stderr,"  -audio_in/audio_out:[id]\t: Select audio input/output to use\n");
 	fprintf(stderr,"  -stdout \t\t\t: stdout mode\n");
 	fprintf(stderr,"  -help \t\t\t: This help\n");
 	fprintf(stderr,"  \nExamples :\n");
@@ -503,7 +504,7 @@ void printhelp(char* argv[])
 	fprintf(stderr,"  Video + audio merging : ffmpeg -i out_video.mkv -i out_audio.wav -c copy output.mkv\n");
 	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp /path/*.vdt\n");
 	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp:out.bmp /path/videotex.vdt\n");
-	fprintf(stderr,"  Minitel server : vdt2bmp -server:vdt/script.txt -uplink -audio_dev:1 -outfile:inscriptions.csv\n");
+	fprintf(stderr,"  Minitel server : vdt2bmp -server:vdt/script.txt -uplink -audio_out:1 -audio_in:1 -outfile:inscriptions.csv\n");
 
 	fprintf(stderr,"\n");
 }
@@ -852,7 +853,7 @@ int main(int argc, char* argv[])
 	char strtmp[1024];
 	modem_ctx mdm_ctx;
 	int pal, outmode;
-	int i,mic_mode,audio_id;
+	int i,mic_mode,audio_in_id,audio_out_id;
 	float framerate;
 	videotex_ctx * vdt_ctx;
 	app_ctx appctx;
@@ -872,7 +873,8 @@ int main(int argc, char* argv[])
 	outmode = OUTPUT_MODE_FILE;
 	framerate = 30.0;
 	mic_mode = 0;
-	audio_id = -1;
+	audio_in_id = -1;
+	audio_out_id = -1;
 
 #ifdef DBG_INJECT_SND
 	indbgfile = NULL;
@@ -938,9 +940,14 @@ int main(int argc, char* argv[])
 #endif
 	}
 
-	if(isOption(argc,argv,"audio_dev",(char*)&strtmp))
+	if(isOption(argc,argv,"audio_in",(char*)&strtmp))
 	{
-		audio_id = atoi(strtmp);
+		audio_in_id = atoi(strtmp);
+	}
+
+	if(isOption(argc,argv,"audio_out",(char*)&strtmp))
+	{
+		audio_out_id = atoi(strtmp);
 	}
 
 	if(isOption(argc,argv,"fps",(char*)&strtmp))
@@ -1018,7 +1025,7 @@ int main(int argc, char* argv[])
 			appctx.sound_fifo.snd_buf = malloc( appctx.sound_fifo.page_size * 16 * sizeof(short) );
 			memset((void*)appctx.sound_fifo.snd_buf,0,appctx.sound_fifo.page_size * 16 * sizeof(short));
 
-			appctx.audio_id_uplink = SDL_OpenAudioDevice(audio_id_to_name(audio_id, 1), 1, &fmt_up, &fmt_up, 0);
+			appctx.audio_id_uplink = SDL_OpenAudioDevice(audio_id_to_name(audio_in_id, 1), 1, &fmt_up, &fmt_up, 0);
 			if ( appctx.audio_id_uplink < 0 )
 			{
 				fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
@@ -1034,7 +1041,11 @@ int main(int argc, char* argv[])
 			create_audioin_thread(&appctx);
 		}
 
-		appctx.audio_id = SDL_OpenAudioDevice(audio_id_to_name(audio_id, mic_mode), mic_mode, &fmt, &fmt, 0);
+		if(mic_mode)
+			appctx.audio_id = SDL_OpenAudioDevice(audio_id_to_name(audio_in_id, mic_mode), mic_mode, &fmt, &fmt, 0);
+		else
+			appctx.audio_id = SDL_OpenAudioDevice(audio_id_to_name(audio_out_id, mic_mode), mic_mode, &fmt, &fmt, 0);
+
 		if ( appctx.audio_id < 0 )
 		{
 			fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
@@ -1130,7 +1141,7 @@ int main(int argc, char* argv[])
 				fmt_up.callback = audio_in;
 				fmt_up.userdata = &appctx;
 
-				appctx.audio_id_uplink = SDL_OpenAudioDevice(audio_id_to_name(audio_id, 1), 1, &fmt_up, &fmt_up, 0);
+				appctx.audio_id_uplink = SDL_OpenAudioDevice(audio_id_to_name(audio_in_id, 1), 1, &fmt_up, &fmt_up, 0);
 				if ( appctx.audio_id_uplink < 0 )
 				{
 					fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
@@ -1144,7 +1155,11 @@ int main(int argc, char* argv[])
 
 			}
 
-			appctx.audio_id = SDL_OpenAudioDevice(audio_id_to_name(audio_id, mic_mode), mic_mode, &fmt, &fmt, 0);
+			if(mic_mode)
+				appctx.audio_id = SDL_OpenAudioDevice(audio_id_to_name(audio_in_id, mic_mode), mic_mode, &fmt, &fmt, 0);
+			else
+				appctx.audio_id = SDL_OpenAudioDevice(audio_id_to_name(audio_out_id, mic_mode), mic_mode, &fmt, &fmt, 0);
+
 			if ( appctx.audio_id < 0 )
 			{
 				fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
