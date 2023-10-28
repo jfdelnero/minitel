@@ -283,6 +283,35 @@ static int get_param( script_ctx * ctx, char * line, int param_offset,char * par
 	return -1;
 }
 
+static int get_param_strvar( script_ctx * ctx, char * line, int param_offset,char * param)
+{
+	int offs;
+	char var_str[DEFAULT_BUFLEN];
+
+	offs = get_param_offset(line, param_offset);
+
+	if(offs>=0)
+	{
+		if(line[offs] != '$')
+		{
+			offs = copy_param(param, line, offs);
+		}
+		else
+		{
+			copy_param(var_str, line, offs);
+
+			if( !getEnvVar( *((envvar_entry **)ctx->env), (char*)&var_str[1], param) )
+			{
+				//copy_param(param, line, offs);
+			}
+		}
+
+		return 1;
+	}
+
+	return -1;
+}
+
 static int get_param_str( script_ctx * ctx, char * line, int param_offset,char * param)
 {
 	int offs;
@@ -1490,6 +1519,7 @@ static int cmd_tx( script_ctx * ctx, char * line)
 	app_ctx * appctx;
 	appctx = (app_ctx *)ctx->app_ctx;
 	char send_buf[DEFAULT_BUFLEN];
+	char *ptr,*var;
 	int i=0, size;
 	unsigned int val;
 
@@ -1502,7 +1532,19 @@ static int cmd_tx( script_ctx * ctx, char * line)
 		if(send_buf[0] == 's' && send_buf[1] == ':')
 		{
 			i = 2;
-			size = strlen(&send_buf[2]);
+			ptr = &send_buf[i];
+			size = strlen(ptr);
+
+			if(send_buf[2] == '$')
+			{
+				var = getEnvVar( *((envvar_entry **)ctx->env), &send_buf[3], NULL);
+				if( var )
+				{
+					i = 0;
+					ptr = var;
+					size = strlen(ptr);
+				}
+			}
 		}
 
 		if(send_buf[0] == 'c' && send_buf[1] == ':')
@@ -1510,45 +1552,45 @@ static int cmd_tx( script_ctx * ctx, char * line)
 			val = get_script_variable( ctx, &send_buf[2]);
 
 			size = 1;
-			send_buf[2] = ( val ) & 0xFF;
+			ptr = &send_buf[2];
+
+			ptr[0] = ( val ) & 0xFF;
 
 			if( val > 0xFF)
 			{
-				send_buf[2] = (val >> 8) & 0xFF;
-				send_buf[3] = ( val ) & 0xFF;
+				ptr[0] = (val >> 8) & 0xFF;
+				ptr[1] = ( val ) & 0xFF;
 
 				size = 2;
 			}
 
 			if( val > 0xFFFF)
 			{
-				send_buf[2] = (val >> 16) & 0xFF;
-				send_buf[3] = (val >> 8) & 0xFF;
-				send_buf[4] = ( val ) & 0xFF;
+				ptr[0] = (val >> 16) & 0xFF;
+				ptr[1] = (val >> 8) & 0xFF;
+				ptr[2] = ( val ) & 0xFF;
 
 				size = 3;
 			}
 
 			if( val > 0xFFFFFF)
 			{
-				send_buf[2] = (val >> 24) & 0xFF;
-				send_buf[3] = (val >> 16) & 0xFF;
-				send_buf[4] = (val >> 8) & 0xFF;
-				send_buf[5] = ( val ) & 0xFF;
+				ptr[0] = (val >> 24) & 0xFF;
+				ptr[1] = (val >> 16) & 0xFF;
+				ptr[2] = (val >> 8) & 0xFF;
+				ptr[3] = ( val ) & 0xFF;
 
 				size = 4;
 			}
-
-			i = 2;
 		}
 
-		for(;i<size+2;i++)
+		for(i=0;i<size;i++)
 		{
 			while ( mdm_is_fifo_full(&appctx->mdm->tx_fifo) )
 			{
 				usleep(1000);
 			}
-			mdm_push_to_fifo(&appctx->mdm->tx_fifo, (unsigned char)send_buf[i]);
+			mdm_push_to_fifo(&appctx->mdm->tx_fifo, (unsigned char)ptr[i]);
 		}
 	}
 
@@ -1583,6 +1625,10 @@ void send_char(script_ctx * ctx, unsigned char c)
 
 	mdm_push_to_fifo(&appctx->mdm->tx_fifo, (unsigned char)c);
 
+#ifdef DEBUG
+	printf ("s>%X\n",c);
+#endif
+
 	return;
 }
 
@@ -1592,7 +1638,28 @@ int is_minitel_alphanum(unsigned short code)
 		(code >= 'a' && code <='z') ||
 		(code >= 'A' && code <='Z') ||
 		(code >= '0' && code <='9') ||
-		(code == ' ')
+		(code == ' ') ||
+		(code == '\'') ||
+		(code == ',') ||
+		(code == '+') ||
+		(code == '*') ||
+		(code == '/') ||
+		(code == '=') ||
+		(code == '?') ||
+		(code == '!') ||
+		(code == '-') ||
+		(code == '%') ||
+		(code == '(') ||
+		(code == ')') ||
+		(code == '<') ||
+		(code == '>') ||
+		(code == '"') ||
+		(code == '@') ||
+		(code == '&') ||
+		(code == '$') ||
+		(code == '#') ||
+		(code == '.') ||
+		(code == ':')
 	)
 	{
 		return 1;
@@ -1627,7 +1694,9 @@ static void edit_area_remove_char( script_ctx * ctx, edit_area * area )
 			send_char(ctx, 0x1F);
 			send_char(ctx, area->y_start_area + area->row);
 			send_char(ctx, area->x_start_area + area->col);
+
 			send_char(ctx, '.');
+
 			send_char(ctx, 0x1F);
 			send_char(ctx, area->y_start_area + area->row);
 			send_char(ctx, area->x_start_area + area->col);
@@ -1651,8 +1720,11 @@ static void edit_area_remove_char( script_ctx * ctx, edit_area * area )
 
 		area->cur_len--;
 		area->field_buf[area->cur_len] = 0;
-
 	}
+
+#ifdef DEBUG
+	printf("col:%d row:%d len:%d\n", area->col, area->row, area->cur_len);
+#endif
 
 	return;
 }
@@ -1661,7 +1733,11 @@ static void edit_area_add_char( script_ctx * ctx, edit_area * area, unsigned sho
 {
 	if( is_minitel_alphanum(code) )
 	{
-		if( area->cur_len < area->max_len )
+		if(
+			( area->cur_len < area->max_len ) &&
+			( area->col <= ( area->x_end_area - area->x_start_area ) ) &&
+			( area->row <= ( area->y_end_area - area->y_start_area ) )
+		)
 		{
 			area->field_buf[area->cur_len++] = code & 0xFF;
 
@@ -1669,14 +1745,15 @@ static void edit_area_add_char( script_ctx * ctx, edit_area * area, unsigned sho
 
 			area->col++;
 
-			if( area->col > ((area->x_end_area - area->x_start_area) ) && area->cur_len < area->max_len)
+			if( area->col > ( area->x_end_area - area->x_start_area ) && area->cur_len < area->max_len)
 			{
-				if( area->row < ( (area->y_end_area - area->y_start_area) ) )
+				if( area->row < ( area->y_end_area - area->y_start_area ) )
 				{
 					area->row++;
 					send_char(ctx, 0x1F);
 					send_char(ctx, area->y_start_area + area->row);
 					send_char(ctx, area->x_start_area);
+					area->col = 0;
 				}
 				else
 				{
@@ -1684,16 +1761,16 @@ static void edit_area_add_char( script_ctx * ctx, edit_area * area, unsigned sho
 					send_char(ctx, area->y_end_area);
 					send_char(ctx, area->x_end_area);
 				}
-				area->col = 0;
 			}
 		}
 	}
+#ifdef DEBUG
+	printf("col:%d row:%d len:%d\n", area->col, area->row, area->cur_len);
+#endif
 }
 
 static int cmd_field_edit( script_ctx * ctx, char * line)
 {
-	app_ctx * appctx;
-	appctx = (app_ctx *)ctx->app_ctx;
 	char tmp_buf[DEFAULT_BUFLEN];
 	envvar_entry * tmp_env;
 	unsigned char field_buf[DEFAULT_BUFLEN];
@@ -1740,8 +1817,27 @@ static int cmd_field_edit( script_ctx * ctx, char * line)
 	send_char(ctx, area.y_start_area);
 	send_char(ctx, area.x_start_area);
 
+	i = get_param_strvar( ctx, line, 6, (char *)field_buf );
+	if(i>=0)
+	{
+		i = 0;
+		while(field_buf[i])
+		{
+			edit_area_add_char( ctx, &area, field_buf[i] );
+			i++;
+		}
+	}
+	else
+	{
+		memset(field_buf, 0, sizeof(field_buf));
+	}
+
 	// Cursor ON
 	send_char(ctx, 0x11);
+
+#ifdef DEBUG
+	printf("xstart:%d ystart:%d xend:%d yend:%d\n", area.x_start_area - 0x40, area.y_start_area - 0x40, area.x_end_area - 0x40,area.y_end_area - 0x40);
+#endif
 
 	while( 1 )
 	{
@@ -1772,14 +1868,6 @@ static int cmd_field_edit( script_ctx * ctx, char * line)
 			break;
 
 			case 0x1342: // Retour
-				// Passage champ précédent
-				tmp_env = setEnvVar( *((envvar_entry **)ctx->env), "TXT_AREA", (char*)&field_buf );
-				if(tmp_env)
-					*((envvar_entry **)ctx->env) = tmp_env;
-
-				return 0x1342;
-			break;
-
 			case 0x1341: // Envoi
 			case 0x1348: // Suite
 				tmp_env = setEnvVar( *((envvar_entry **)ctx->env), "TXT_AREA", (char*)&field_buf );
@@ -1787,7 +1875,7 @@ static int cmd_field_edit( script_ctx * ctx, char * line)
 					*((envvar_entry **)ctx->env) = tmp_env;
 
 				// Passage champ suivant
-				return 0x1348;
+				return code;
 			break;
 
 			default:
@@ -1802,6 +1890,80 @@ error:
 	ctx->script_printf( ctx, MSG_ERROR, "ERROR : field_edit - Bad parameter(s)\nfield_edit x_start_area y_start_area x_end_area y_end_area max_string_len\n");
 
 	return SCRIPT_CMD_BAD_PARAMETER;
+}
+
+static int cmd_writetocsv( script_ctx * ctx, char * line)
+{
+	int i,j,s;
+	char tmp_str[DEFAULT_BUFLEN];
+	char str[DEFAULT_BUFLEN*2];
+	char * ptr;
+	FILE * file;
+
+	str[0] = 0;
+	i = get_param( ctx, line, 1, (char*)&tmp_str );
+	if( i >= 0)
+	{
+		file = fopen(tmp_str,"a");
+		if(!file)
+		{
+			ctx->script_printf( ctx, MSG_ERROR, "Can't open/create %s\n", tmp_str );
+			return SCRIPT_ACCESS_ERROR;
+		}
+	}
+	else
+	{
+		return SCRIPT_CMD_BAD_PARAMETER;
+	}
+
+	j = 2;
+	do
+	{
+		ptr = NULL;
+
+		i = get_param_offset(line, j);
+		s = 0;
+
+		if(i>=0)
+		{
+			s = get_param( ctx, line, j, (char *)&tmp_str );
+			if(s>=0)
+			{
+				if(tmp_str[0] != '$')
+				{
+					strncat((char*)str,"\"",sizeof(str) - 1);
+					strncat((char*)str,tmp_str,sizeof(str) - 1);
+					strncat((char*)str,"\";",sizeof(str) - 1);
+				}
+				else
+				{
+					ptr = getEnvVar( *((envvar_entry **)ctx->env), &tmp_str[1], NULL);
+					if( ptr )
+					{
+						strncat((char*)str,"\"",sizeof(str) - 1);
+						strncat((char*)str,ptr,sizeof(str) - 1);
+						strncat((char*)str,"\";",sizeof(str) - 1);
+					}
+					else
+					{
+						strncat((char*)str,"\"",sizeof(str) - 1);
+						strncat((char*)str,tmp_str,sizeof(str) - 1);
+						strncat((char*)str,"\";",sizeof(str) - 1);
+					}
+				}
+			}
+		}
+
+		j++;
+	}while(s);
+
+	ctx->script_printf( ctx, MSG_NONE, "%s\n", str );
+
+	fprintf(file,"%s\n", str);
+
+	fclose(file);
+
+	return SCRIPT_NO_ERROR;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1836,6 +1998,7 @@ cmd_list script_commands_list[] =
 	{"tx",                      cmd_tx},
 	{"rx_carrier_present",      cmd_rx_carrier},
 	{"field_edit",              cmd_field_edit},
+	{"writetocsvfile",          cmd_writetocsv},
 
 	{ 0, 0 }
 };
