@@ -55,6 +55,7 @@ typedef struct app_ctx_
 	char outfile_file[512];
 
 	uint32_t io_cfg_flags;
+	int timeout_seconds;
 
 	int verbose;
 	int quit;

@@ -156,6 +156,30 @@ int32_t waitevent(EVENT_HANDLE* theevent,int32_t timeout)
 #endif
 }
 
+uint32_t get_elapsed_tick(uint32_t start, uint32_t curcount)
+{
+	if( curcount < start )
+	{
+		return ((0xFFFFFFFF - start) + curcount);
+	}
+	else
+	{
+		return (curcount - start);
+	}
+}
+
+int is_timeouted(uint32_t start, uint32_t curcount, uint32_t max_ticks)
+{
+	uint32_t tick;
+
+	tick = get_elapsed_tick(start,curcount);
+
+	if(tick > max_ticks)
+		return 1;
+
+	return 0;
+}
+
 //////////////////////////////////////////////////////////////////
 // Audio callbacks
 //////////////////////////////////////////////////////////////////
@@ -191,6 +215,7 @@ int pop_audio_page(app_ctx * ctx, short * buf)
 void audio_out(void *ctx, Uint8 *stream, int len)
 {
 	modem_ctx *mdm;
+	int timeout;
 
 	mdm = ((app_ctx *)ctx)->mdm;
 
@@ -223,6 +248,23 @@ void audio_out(void *ctx, Uint8 *stream, int len)
 	if ( ((app_ctx *)ctx)->io_cfg_flags & FLAGS_SDL_IO_SCREEN )
 	{
 		mdm_demodulate(mdm, &mdm->demodulators[0],(short *)stream, len/2);
+	}
+
+	timeout = ((app_ctx *)ctx)->timeout_seconds;
+
+	if( timeout )
+	{
+		if ( 
+			is_timeouted( mdm->last_tx_tick, mdm->wave_out_pages_cnt, ( (mdm->sample_rate*timeout) / mdm->wave_size ) ) &&
+			is_timeouted( mdm->serial_rx[1].last_rx_tick, mdm->wave_out_pages_cnt, ( (mdm->sample_rate*timeout) / mdm->wave_size ) )
+		)
+		{
+			// No rx/tx event sync X seconds ?
+			// Send a fake timeout code to the script engine...
+			mdm_push_to_fifo(&mdm->rx_fifo[1], 0x13);
+			mdm_push_to_fifo(&mdm->rx_fifo[1], 0x7F);
+			mdm->serial_rx[1].last_rx_tick = mdm->wave_out_pages_cnt;
+		}
 	}
 
 	//memset(stream,0,len);
@@ -1136,6 +1178,13 @@ int main(int argc, char* argv[])
 
 		mdm_init(&mdm_ctx);
 		appctx.mdm = &mdm_ctx;
+
+		appctx.timeout_seconds = 4*60;
+
+		if(isOption(argc,argv,"timeout",(char*)&strtmp))
+		{
+			appctx.timeout_seconds = atoi(strtmp);
+		}
 
 		appctx.snd_event = createevent();
 

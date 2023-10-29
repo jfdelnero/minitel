@@ -1851,6 +1851,10 @@ static int cmd_field_edit( script_ctx * ctx, char * line)
 				return 0x1346;
 			break;
 
+			case 0x137F: // Timeout
+				return 0x137F;
+			break;
+
 			case 0x1345: // Annulation
 				// Effacement ligne complète
 				while( area.cur_len )
@@ -1885,6 +1889,34 @@ error:
 	ctx->script_printf( ctx, MSG_ERROR, "ERROR : field_edit - Bad parameter(s)\nfield_edit x_start_area y_start_area x_end_area y_end_area max_string_len\n");
 
 	return SCRIPT_CMD_BAD_PARAMETER;
+}
+
+static int cmd_wait_key( script_ctx * ctx, char * line)
+{
+	app_ctx * appctx;
+	appctx = (app_ctx *)ctx->app_ctx;
+	unsigned short code;
+	unsigned char c;
+
+	code = 0;
+	do
+	{
+		code <<= 8;
+
+		while ( mdm_is_fifo_empty(&appctx->mdm->rx_fifo[1]) )
+		{
+			usleep(4000);
+		}
+
+		mdm_pop_from_fifo(&appctx->mdm->rx_fifo[1], &c);
+
+		code |= c;
+
+	}while( code == 0x13 );
+
+	ctx->last_data_value = code;
+
+	return SCRIPT_NO_ERROR;
 }
 
 static int cmd_writetocsv( script_ctx * ctx, char * line)
@@ -1990,6 +2022,7 @@ cmd_list script_commands_list[] =
 	{"purge_rx_buffer",         cmd_purge_rx_buffer},
 	{"purge_tx_buffer",         cmd_purge_tx_buffer},
 	{"rx_char",                 cmd_rx_char},
+	{"wait_key",                cmd_wait_key},
 	{"tx",                      cmd_tx},
 	{"rx_carrier_present",      cmd_rx_carrier},
 	{"field_edit",              cmd_field_edit},
