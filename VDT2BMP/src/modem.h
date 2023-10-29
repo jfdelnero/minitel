@@ -73,6 +73,9 @@ typedef struct modem_demodulator_ctx_
 	int uart_rx_idx;
 
 	int carrier_detect;
+
+	unsigned int wave_in_pages_cnt;
+
 }modem_demodulator_ctx;
 
 typedef struct serial_rx_
@@ -87,6 +90,8 @@ typedef struct serial_rx_
 	float bit_time;
 
 	int fifo_idx;
+
+	unsigned int last_rx_tick;
 }serial_rx_ctx;
 
 typedef struct modem_ctx_
@@ -98,6 +103,8 @@ typedef struct modem_ctx_
 	int serial_parity;
 	int serial_post_idle;
 	int serial_msb_first;
+
+	unsigned int last_tx_tick;
 
 	unsigned int freqs[3];
 	float mod_step[3];
@@ -129,6 +136,7 @@ typedef struct modem_ctx_
 
 	serial_fifo tx_fifo;
 
+	unsigned int wave_out_pages_cnt;
 }modem_ctx;
 
 void mdm_init(modem_ctx *mdm);

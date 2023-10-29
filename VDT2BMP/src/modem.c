@@ -352,6 +352,8 @@ int mdm_serial_rx(modem_ctx *mdm, serial_rx_ctx * rx_ctx, int state)
 				printf("RX Fifo full !\n");
 			}
 
+			rx_ctx->last_rx_tick = mdm->wave_out_pages_cnt;
+
 #if 0
 			printf("RX : 0x%.2X\n",rx_ctx->serial_rx_shiftreg);
 #endif
@@ -400,6 +402,7 @@ int mdm_genWave(modem_ctx *mdm, short * buf, int size)
 
 					mdm->tx_bittime_cnt = (int)mdm->bit_time;
 
+					mdm->last_tx_tick = mdm->wave_out_pages_cnt;
 				}
 				else
 				{
@@ -422,6 +425,8 @@ int mdm_genWave(modem_ctx *mdm, short * buf, int size)
 		i++;
 
 	}while(i<size);
+
+	mdm->wave_out_pages_cnt++;
 
 	return 0;
 }
@@ -601,6 +606,8 @@ void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wave
 			printf("%f;%f;%f;%f;%f;%f;%f;%d\n",mdm_dmt->power[0],mdm_dmt->power[1],mdm_dmt->power[2],mdm_dmt->power[3],mdm_dmt->add[0],mdm_dmt->add[1],result,bit);
 #endif
 	}
+
+	mdm_dmt->wave_in_pages_cnt++;
 }
 
 int  mdm_is_carrier_present(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt)
