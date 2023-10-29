@@ -18,6 +18,7 @@ Minitel server :
 vdt2bmp -server:vdt/script.txt -outfile:inscriptions.csv
 
 Available command line options :
+```c
 	-bmp[:out_file.bmp]       : Generate bmp file(s)
 	-ani                      : Generate animation (Simulate Minitel page loading.)
 	-server:[script path]     : Server mode
@@ -26,6 +27,7 @@ Available command line options :
 	-audio_list               : List the available audio input(s)/output(s)
 	-audio_in/audio_out:[id]  : Select audio input/output to use
 	-stdout                   : stdout mode (for piped ffmpeg compression)
+```
 
 [![Watch the video](http://hxc2001.free.fr/minitel/pages_minitel/minitel_etam.png)](http://hxc2001.free.fr/minitel/pages_minitel/minitel_etam.mp4)
 
