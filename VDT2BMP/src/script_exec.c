@@ -38,6 +38,8 @@
 #include <stdint.h>
 #include <pthread.h>
 
+#include <time.h>
+
 #ifdef WIN32
 #include <windows.h>
 #endif
@@ -1617,6 +1619,22 @@ static int cmd_tx( script_ctx * ctx, char * line)
 	return SCRIPT_NO_ERROR;
 }
 
+static int cmd_getcurdate( script_ctx * ctx, char * line)
+{
+	time_t t = time(NULL);
+	struct tm tm = *localtime(&t);
+	char str_date[DEFAULT_BUFLEN];
+	envvar_entry * tmp_env;
+
+	sprintf(str_date, "%d-%02d-%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+	tmp_env = setEnvVar( *((envvar_entry **)ctx->env), "DATETIME", (char*)&str_date );
+	if(tmp_env)
+		*((envvar_entry **)ctx->env) = tmp_env;
+
+	return SCRIPT_NO_ERROR;
+}
+
 unsigned char wait_char(script_ctx * ctx)
 {
 	app_ctx * appctx;
@@ -2053,6 +2071,7 @@ cmd_list script_commands_list[] =
 	{"rx_carrier_present",      cmd_rx_carrier},
 	{"field_edit",              cmd_field_edit},
 	{"writetocsvfile",          cmd_writetocsv},
+	{"getcurdate",              cmd_getcurdate},
 
 	{ 0, 0 }
 };
