@@ -1395,26 +1395,40 @@ static int cmd_initarray( script_ctx * ctx, char * line)
 
 static int cmd_send_file( script_ctx * ctx, char * line)
 {
-	int i,ret,offset;
+	int i,j,ret,offset;
 	file_cache fc;
 	char filename[DEFAULT_BUFLEN];
+	char tmpstr[DEFAULT_BUFLEN];
 	unsigned char c;
+	int waitempty;
 	app_ctx * appctx;
 
 	appctx = (app_ctx *)ctx->app_ctx;
 
 	ret = SCRIPT_CMD_BAD_PARAMETER;
 
-	i = get_param_str( ctx, line, 1, filename );
+	waitempty = 1;
 
+	tmpstr[0] = 0;
+
+	i = get_param_str( ctx, line, 1, filename );
+	j = get_param_str( ctx, line, 2, tmpstr );
 	if(i>=0)
 	{
 		memset(&fc,0,sizeof(file_cache));
 
+		if( j>=0 )
+		{
+			if(!strcmp(tmpstr, "NOWAIT") )
+			{
+				waitempty = 0;
+			}
+		}
+
 		if(open_file(&fc, filename,0xFF)>=0)
 		{
 			offset = 0;
-			while( ( offset<fc.file_size || !mdm_is_fifo_empty(&appctx->mdm->tx_fifo) ) )
+			while( ( offset<fc.file_size || ( !mdm_is_fifo_empty(&appctx->mdm->tx_fifo) && waitempty ) ) )
 			{
 				while(!mdm_is_fifo_full(&appctx->mdm->tx_fifo) && offset<fc.file_size)
 				{
@@ -1475,6 +1489,17 @@ static int cmd_is_tx_buffer_empty( script_ctx * ctx, char * line)
 	appctx = (app_ctx *)ctx->app_ctx;
 
 	if( mdm_is_fifo_empty(&appctx->mdm->tx_fifo) )
+		return SCRIPT_TRUE;
+	else
+		return SCRIPT_FALSE;
+}
+
+static int cmd_is_rx_buffer_empty( script_ctx * ctx, char * line)
+{
+	app_ctx * appctx;
+	appctx = (app_ctx *)ctx->app_ctx;
+
+	if( mdm_is_fifo_empty(&appctx->mdm->rx_fifo[1]) )
 		return SCRIPT_TRUE;
 	else
 		return SCRIPT_FALSE;
@@ -2019,6 +2044,7 @@ cmd_list script_commands_list[] =
 
 	{"send_file",               cmd_send_file},
 	{"is_tx_buffer_empty",      cmd_is_tx_buffer_empty},
+	{"is_rx_buffer_empty",      cmd_is_rx_buffer_empty},
 	{"purge_rx_buffer",         cmd_purge_rx_buffer},
 	{"purge_tx_buffer",         cmd_purge_tx_buffer},
 	{"rx_char",                 cmd_rx_char},
