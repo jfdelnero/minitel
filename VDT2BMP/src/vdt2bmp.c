@@ -78,9 +78,10 @@ Available command line options :
 
 #include "data/vdt_tests.h"
 
+#include "script_exec.h"
+
 #include "vdt2bmp.h"
 
-#include "script_exec.h"
 
 #include "version.h"
 
@@ -218,13 +219,17 @@ void audio_out(void *ctx, Uint8 *stream, int len)
 
 #endif
 
-	mdm_demodulate(mdm, &mdm->demodulators[0],(short *)stream, len/2);
+	// Send back the wave to the monitor demodulator window
+	if ( ((app_ctx *)ctx)->io_cfg_flags & FLAGS_SDL_IO_SCREEN )
+	{
+		mdm_demodulate(mdm, &mdm->demodulators[0],(short *)stream, len/2);
+	}
+
 	//memset(stream,0,len);
 }
 
 void audio_in(void *ctx, Uint8 *stream, int len)
 {
-	setevent(((app_ctx *)ctx)->snd_event);
 
 #ifdef DBG_INJECT_SND
 	if(indbgfile)
@@ -232,7 +237,7 @@ void audio_in(void *ctx, Uint8 *stream, int len)
 #endif
 
 	push_audio_page((app_ctx *)ctx, (short *)stream);
-
+	setevent(((app_ctx *)ctx)->snd_event);
 }
 
 void * AudioInThreadProc( void *lpParameter )
@@ -252,7 +257,7 @@ void * AudioInThreadProc( void *lpParameter )
 
 		if(pop_audio_page(ctx, buf))
 		{
-			if(ctx->uplink)
+			if(ctx->io_cfg_flags & FLAGS_SDL_IO_AUDIOIN)
 			{
 				int i;
 
@@ -285,6 +290,46 @@ void * AudioInThreadProc( void *lpParameter )
 	return 0;
 }
 
+int SCRIPT_CUI_affiche(void * ctx, int MSGTYPE, char * string, ... )
+{
+	if( MSGTYPE!=MSG_DEBUG )
+	{
+		va_list marker;
+		va_start( marker, string );
+
+		vprintf(string,marker);
+		printf("\n");
+
+		va_end( marker );
+	}
+
+	return 0;
+}
+
+void * ScriptServerThreadProc( void *lpParameter )
+{
+	app_ctx * ctx;
+	script_ctx * script;
+
+	ctx = (app_ctx *)lpParameter;
+
+	script = init_script((void *)ctx, 0x00000000, (void*)&ctx->env);
+	if( script )
+	{
+		ctx->srvscript = (void*)script;
+
+		setOutputFunc_script( script, SCRIPT_CUI_affiche );
+
+		ctx->env = setEnvVar(ctx->env, "OUTFILE", (char*)&ctx->outfile_file );
+
+		execute_file_script( script, (char*)&ctx->script_file );
+
+		deinit_script( script );
+	}
+
+	return 0;
+}
+
 int32_t create_audioin_thread(app_ctx * ctx)
 {
 	uint32_t sit;
@@ -312,88 +357,32 @@ int32_t create_audioin_thread(app_ctx * ctx)
 	return sit;
 }
 
-Uint32 video_tick(Uint32 interval, void *param)
+int32_t create_script_thread(app_ctx * ctx)
 {
-	uint8_t * pixels;
-	bitmap_data bmp;
-	videotex_ctx * vdt_ctx;
-	modem_ctx *mdm;
-	app_ctx *app;
-	SDL_Surface *sdl_scr;
-	int i;
+	uint32_t sit;
+	pthread_t threadid;
+	pthread_attr_t threadattrib;
+	int ret;
 
-	app = ((app_ctx *)param);
-	mdm = app->mdm;
-	vdt_ctx = app->vdt_ctx;
-	sdl_scr = app->screen;
+	sit = 0;
 
-	update_frame(vdt_ctx,mdm, &bmp);
+	//pthread_attr_create(&threadattrib);
+	pthread_attr_init(&threadattrib);
+	pthread_attr_setinheritsched(&threadattrib,PTHREAD_EXPLICIT_SCHED);
 
-	if (SDL_MUSTLOCK(sdl_scr))
-		SDL_LockSurface(sdl_scr);
+	pthread_attr_setschedpolicy(&threadattrib,SCHED_FIFO);
+	/* set the new scheduling param */
+	//pthread_attr_setschedparam (&threadattrib, &param);
 
-	pixels = sdl_scr->pixels;
-
-#ifdef EMSCRIPTEN_SUPPORT
-	for(i=0;i<(bmp.xsize * bmp.ysize);i++)
+	ret = pthread_create(&threadid,0,ScriptServerThreadProc, ctx);
+	if(ret)
 	{
-		pixels[(i*4)+0] = bmp.data[i] & 0xFF;
-		pixels[(i*4)+1] = (bmp.data[i]>>8) & 0xFF;
-		pixels[(i*4)+2] = (bmp.data[i]>>16) & 0xFF;
+	#ifdef DEBUG
+		printf("create_script_thread : pthread_create failed -> %d",ret);
+	#endif
 	}
-#else
-	for(i=0;i<(bmp.xsize * bmp.ysize);i++)
-	{
-		pixels[(i*4)+2] = bmp.data[i] & 0xFF;
-		pixels[(i*4)+1] = (bmp.data[i]>>8) & 0xFF;
-		pixels[(i*4)+0] = (bmp.data[i]>>16) & 0xFF;
-	}
-#endif
 
-	if (SDL_MUSTLOCK(sdl_scr))
-		SDL_UnlockSurface(sdl_scr);
-
-	SDL_UpdateWindowSurface(app->window);
-
-#ifdef EMSCRIPTEN_SUPPORT
-	// Test page loop
-	app->imgcnt++;
-
-	if(app->imgcnt > vdt_ctx->framerate * 2 )
-	{
-
-		if(app->indexbuf >= vdt_test_pages_size[app->pageindex] )
-		{
-			if( mdm_is_fifo_empty(&mdm->tx_fifo) )
-			{
-				app->indexbuf = 0;
-				app->imgcnt = 0;
-
-				app->pageindex++;
-				if(vdt_test_pages[app->pageindex] == NULL)
-					app->pageindex = 0;
-
-			}
-		}
-		else
-		{
-			unsigned char * ptr;
-
-			ptr = vdt_test_pages[app->pageindex];
-			while( app->indexbuf < vdt_test_pages_size[app->pageindex] )
-			{
-				if( !mdm_push_to_fifo( &mdm->tx_fifo, ptr[app->indexbuf] ) )
-				{
-					break;
-				}
-
-				app->indexbuf++;
-			}
-		}
-	}
-#endif
-
-	return interval;
+	return sit;
 }
 
 #ifdef EMSCRIPTEN_SUPPORT
@@ -492,11 +481,13 @@ void printhelp(char* argv[])
 	fprintf(stderr,"Options:\n");
 	fprintf(stderr,"  -bmp[:out_file.bmp] \t\t: generate bmp file(s)\n");
 	fprintf(stderr,"  -ani\t\t\t\t: generate animation\n");
+#ifdef SDL_SUPPORT
 	fprintf(stderr,"  -server:[script path]\t\t: Server mode\n");
-	fprintf(stderr,"  -sdl\t\t\t\t: SDL mode\n");
+	fprintf(stderr,"  -disable_window\t\t: disable window\n");
 	fprintf(stderr,"  -mic\t\t\t\t: Use the Microphone/Input line instead of files\n");
 	fprintf(stderr,"  -audio_list\t\t\t: List the available audio input(s)/output(s)\n");
 	fprintf(stderr,"  -audio_in/audio_out:[id]\t: Select audio input/output to use\n");
+#endif
 	fprintf(stderr,"  -stdout \t\t\t: stdout mode\n");
 	fprintf(stderr,"  -help \t\t\t: This help\n");
 	fprintf(stderr,"  \nExamples :\n");
@@ -504,7 +495,9 @@ void printhelp(char* argv[])
 	fprintf(stderr,"  Video + audio merging : ffmpeg -i out_video.mkv -i out_audio.wav -c copy output.mkv\n");
 	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp /path/*.vdt\n");
 	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp:out.bmp /path/videotex.vdt\n");
-	fprintf(stderr,"  Minitel server : vdt2bmp -server:vdt/script.txt -uplink -audio_out:1 -audio_in:1 -outfile:inscriptions.csv\n");
+#ifdef SDL_SUPPORT
+	fprintf(stderr,"  Minitel server : vdt2bmp -server:vdt/script.txt -audio_out:1 -audio_in:1 -outfile:inscriptions.csv\n");
+#endif
 
 	fprintf(stderr,"\n");
 }
@@ -811,22 +804,6 @@ alloc_error:
 	return -3;
 }
 
-int SCRIPT_CUI_affiche(void * ctx, int MSGTYPE, char * string, ... )
-{
-	if( MSGTYPE!=MSG_DEBUG )
-	{
-		va_list marker;
-		va_start( marker, string );
-
-		vprintf(string,marker);
-		printf("\n");
-
-		va_end( marker );
-	}
-
-	return 0;
-}
-
 const char * audio_id_to_name(int id, int input)
 {
 #ifdef SDL_SUPPORT
@@ -846,6 +823,191 @@ const char * audio_id_to_name(int id, int input)
 #endif
 }
 
+#ifdef SDL_SUPPORT
+
+void update_surface(app_ctx * appctx, uint8_t * pixels)
+{
+	bitmap_data bmp;
+	int i;
+
+	if(appctx->vdt_ctx && appctx->mdm)
+	{
+		update_frame(appctx->vdt_ctx,appctx->mdm, &bmp);
+
+		if( pixels )
+		{
+			for(i=0;i<(bmp.xsize * bmp.ysize);i++)
+			{
+				pixels[(i*4)+2] = bmp.data[i] & 0xFF;
+				pixels[(i*4)+1] = (bmp.data[i]>>8) & 0xFF;
+				pixels[(i*4)+0] = (bmp.data[i]>>16) & 0xFF;
+			}
+		}
+	}
+}
+
+int SDL_app_loop( app_ctx * appctx, int audio_in_id, int audio_out_id)
+{
+	int audio_in_sdl_id;
+	int audio_out_sdl_id;
+	SDL_Surface *screen;
+	SDL_Window *window;
+	SDL_AudioSpec fmt_in;
+	SDL_AudioSpec fmt_out;
+	SDL_Event e;
+
+	int quit, ret;
+	int lastUpdateTick;
+
+	ret = -1;
+	window = NULL;
+	screen = NULL;
+	audio_in_sdl_id = 0;
+	audio_out_sdl_id = 0;
+
+	SDL_Init(SDL_INIT_EVERYTHING);
+
+	appctx->keystate = SDL_GetKeyboardState(NULL);
+
+	if( appctx->io_cfg_flags & FLAGS_SDL_IO_SCREEN )
+	{
+		window = SDL_CreateWindow( "Minitel", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, appctx->vdt_ctx->bmp_res_x, appctx->vdt_ctx->bmp_res_y, SDL_WINDOW_SHOWN );
+		if(!window)
+		{
+			fprintf(stderr, "ERROR : SDL_CreateWindow - %s\n",SDL_GetError());
+			goto sdl_exit;
+		}
+
+		screen = SDL_GetWindowSurface( window );
+		if(!screen)
+		{
+			fprintf(stderr, "ERROR : SDL_GetWindowSurface - %s\n",SDL_GetError());
+			goto sdl_exit;
+		}
+	}
+	else
+	{
+		window = NULL;
+		screen = NULL;
+	}
+
+	if(!(SDL_WasInit(SDL_INIT_AUDIO) & SDL_INIT_AUDIO))
+	{
+		if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
+		{
+			fprintf(stderr, "ERROR : SDL_INIT_AUDIO not initialized !\n");
+			goto sdl_exit;
+		}
+	}
+
+	memset(&fmt_in,0,sizeof(fmt_in));
+	fmt_in.freq = appctx->mdm->sample_rate;
+	fmt_in.format = AUDIO_S16;
+	fmt_in.channels = 1;
+	fmt_in.samples = appctx->mdm->wave_size;
+	fmt_in.callback = audio_in;
+	fmt_in.userdata = appctx;
+
+	memset(&fmt_out,0,sizeof(fmt_out));
+	fmt_out.freq = appctx->mdm->sample_rate;
+	fmt_out.format = AUDIO_S16;
+	fmt_out.channels = 1;
+	fmt_out.samples = appctx->mdm->wave_size;
+	fmt_out.callback = audio_out;
+	fmt_out.userdata = appctx;
+
+	if( appctx->io_cfg_flags & FLAGS_SDL_IO_AUDIOIN )
+	{
+		audio_in_sdl_id = SDL_OpenAudioDevice(audio_id_to_name(audio_in_id, 1), 1, &fmt_in, &fmt_in, 0);
+		if ( audio_in_sdl_id <= 0 )
+		{
+			fprintf(stderr, "SDL Sound in Init error: %s\n", SDL_GetError());
+			goto sdl_exit;
+		}
+	}
+
+	if( appctx->io_cfg_flags & FLAGS_SDL_IO_AUDIOOUT )
+	{
+		audio_out_sdl_id = SDL_OpenAudioDevice(audio_id_to_name(audio_out_id, 0), 0, &fmt_out, &fmt_out, 0);
+		if ( audio_out_sdl_id <= 0 )
+		{
+			fprintf(stderr, "SDL Sound out Init error: %s\n", SDL_GetError());
+			goto sdl_exit;
+		}
+	}
+
+	if( audio_in_sdl_id > 0 )
+		SDL_PauseAudioDevice( audio_in_sdl_id, SDL_FALSE );
+
+	if( audio_out_sdl_id > 0 )
+		SDL_PauseAudioDevice( audio_out_sdl_id, SDL_FALSE );
+
+	ret = 0;
+
+	#define TICKS_FOR_NEXT_FRAME (1000 / appctx->vdt_ctx->framerate)
+
+	lastUpdateTick = 0;
+	quit = 0;
+	do
+	{
+		while ( ( SDL_GetTicks() - lastUpdateTick ) < TICKS_FOR_NEXT_FRAME && !quit)
+		{
+			while( SDL_PollEvent( &e ) )
+			{
+				if( e.type == SDL_QUIT )
+					quit = 1;
+			}
+			SDL_Delay(5);
+		}
+
+		lastUpdateTick = SDL_GetTicks();
+/*
+		if (appctx->keystate[SDL_SCANCODE_RIGHT])
+		{
+			printf("key pressed !\n");
+		}
+*/
+		if( screen && window )
+		{
+			if ( SDL_MUSTLOCK( screen ) )
+				SDL_LockSurface( screen );
+
+			// update buffer
+			update_surface(appctx, screen->pixels);
+
+			if ( SDL_MUSTLOCK( screen ) )
+				SDL_UnlockSurface( screen );
+
+			SDL_UpdateWindowSurface( window );
+		}
+
+	} while( !quit );
+
+sdl_exit:
+
+	if( audio_in_sdl_id > 0)
+	{
+		SDL_PauseAudioDevice( audio_in_sdl_id, SDL_TRUE );
+		SDL_CloseAudioDevice( audio_in_sdl_id );
+	}
+
+	if( audio_out_sdl_id > 0)
+	{
+		SDL_PauseAudioDevice( audio_out_sdl_id, SDL_TRUE );
+		SDL_CloseAudioDevice( audio_out_sdl_id );
+	}
+
+	//Destroy window
+	if( window )
+		SDL_DestroyWindow( window );
+
+	//Quit SDL subsystems
+	SDL_Quit();
+
+	return ret;
+}
+#endif
+
 int main(int argc, char* argv[])
 {
 	char filename[512];
@@ -853,28 +1015,28 @@ int main(int argc, char* argv[])
 	char strtmp[1024];
 	modem_ctx mdm_ctx;
 	int pal, outmode;
-	int i,mic_mode,audio_in_id,audio_out_id;
+	int i,mic_mode;
 	float framerate;
 	videotex_ctx * vdt_ctx;
 	app_ctx appctx;
-	script_ctx * scriptctx;
+#ifdef SDL_SUPPORT
+	int audio_in_id,audio_out_id;
+#endif
 
 	memset(&appctx,0,sizeof(app_ctx));
 
 	appctx.env = setEnvVar(appctx.env, "VERSION", "v"STR_FILE_VERSION2);
-
-#ifdef SDL_SUPPORT
-	SDL_AudioSpec fmt;
-	SDL_AudioSpec fmt_up;
-#endif
+	appctx.io_cfg_flags = FLAGS_SDL_IO_SCREEN | FLAGS_SDL_IO_AUDIOIN | FLAGS_SDL_IO_AUDIOOUT;
 
 	vdt_ctx = NULL;
 	appctx.quit = 0;
 	outmode = OUTPUT_MODE_FILE;
-	framerate = 30.0;
+	framerate = 15.0;
 	mic_mode = 0;
+#ifdef SDL_SUPPORT
 	audio_in_id = -1;
 	audio_out_id = -1;
+#endif
 
 #ifdef DBG_INJECT_SND
 	indbgfile = NULL;
@@ -908,12 +1070,11 @@ int main(int argc, char* argv[])
 	{
 		mic_mode = 1;
 		band_pass_rx_Filter_init(&appctx.rx_fir);
-		appctx.fir_en = 1;
 	}
 
+#ifdef SDL_SUPPORT
 	if(isOption(argc,argv,"audio_list",(char*)&strtmp))
 	{
-#ifdef SDL_SUPPORT
 		int i, in_num, out_num;
 		const char * ptr;
 
@@ -937,7 +1098,6 @@ int main(int argc, char* argv[])
 			if(ptr)
 				fprintf(stderr,"In %d  : %s\n",i,ptr);
 		}
-#endif
 	}
 
 	if(isOption(argc,argv,"audio_in",(char*)&strtmp))
@@ -950,23 +1110,26 @@ int main(int argc, char* argv[])
 		audio_out_id = atoi(strtmp);
 	}
 
+	if(isOption(argc,argv,"disable_window",(char*)&strtmp))
+	{
+		appctx.io_cfg_flags = appctx.io_cfg_flags & ~FLAGS_SDL_IO_SCREEN;
+	}
+#endif
+
 	if(isOption(argc,argv,"fps",(char*)&strtmp))
 	{
 		framerate = atof(strtmp);
 		if(framerate <= 0)
-			framerate = 30.0;
+			framerate = 15.0;
 	}
 
 	if(isOption(argc,argv,"server",(char*)&filename)>0)
 	{
 #ifdef SDL_SUPPORT
-		SDL_Init(SDL_INIT_EVERYTHING);
-		appctx.keystate = SDL_GetKeyboardState(NULL);
-
-		outmode = OUTPUT_MODE_SDL;
-
 		vdt_ctx = vdt_init();
+
 		appctx.vdt_ctx = vdt_ctx;
+
 		vdt_ctx->framerate = framerate;
 
 		vdt_load_charset(vdt_ctx, NULL);
@@ -974,205 +1137,27 @@ int main(int argc, char* argv[])
 		mdm_init(&mdm_ctx);
 		appctx.mdm = &mdm_ctx;
 
-		appctx.window = SDL_CreateWindow( "Minitel", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, vdt_ctx->bmp_res_x, vdt_ctx->bmp_res_y, SDL_WINDOW_SHOWN );
-		if(!appctx.window)
+		appctx.snd_event = createevent();
+
+		appctx.sound_fifo.page_size = DEFAULT_SOUND_BUFFER_SIZE;
+		appctx.sound_fifo.snd_buf = malloc( appctx.sound_fifo.page_size * 16 * sizeof(short) );
+		memset((void*)appctx.sound_fifo.snd_buf,0,appctx.sound_fifo.page_size * 16 * sizeof(short));
+
+		low_pass_tx_Filter_init(&appctx.tx_fir);
+
+		create_audioin_thread(&appctx);
+
+		strcpy((char*)&appctx.script_file, filename);
+
+		strcpy((char*)&appctx.outfile_file, "default_out.txt");
+		if(isOption(argc,argv,"outfile", (char*)&ofilename))
 		{
-			fprintf(stderr, "ERROR : SDL_CreateWindow - %s\n",SDL_GetError());
-			return -1;
+			strcpy((char*)&appctx.outfile_file, ofilename);
 		}
 
-		appctx.screen = SDL_GetWindowSurface( appctx.window );
-		if(!appctx.screen)
-		{
-			fprintf(stderr, "ERROR : SDL_GetWindowSurface - %s\n",SDL_GetError());
-			return -1;
-		}
+		create_script_thread(&appctx);
 
-		if(!(SDL_WasInit(SDL_INIT_AUDIO) & SDL_INIT_AUDIO))
-		{
-			if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
-			{
-				fprintf(stderr, "ERROR : SDL_INIT_AUDIO not initialized !\n");
-				return -1;
-			}
-		}
-
-		memset(&fmt,0,sizeof(fmt));
-		fmt.freq = mdm_ctx.sample_rate;
-		fmt.format = AUDIO_S16;
-		fmt.channels = 1;
-		fmt.samples = mdm_ctx.wave_size;
-		if(mic_mode)
-			fmt.callback = audio_in;
-		else
-			fmt.callback = audio_out;
-
-		fmt.userdata = &appctx;
-
-		if(isOption(argc,argv,"uplink",NULL)>0)
-		{
-			memset(&fmt_up,0,sizeof(fmt));
-			fmt_up.freq = mdm_ctx.sample_rate;
-			fmt_up.format = AUDIO_S16;
-			fmt_up.channels = 1;
-			fmt_up.samples = mdm_ctx.wave_size;
-			fmt_up.callback = audio_in;
-			fmt_up.userdata = &appctx;
-
-			appctx.snd_event = createevent();
-
-			appctx.sound_fifo.page_size = DEFAULT_SOUND_BUFFER_SIZE;
-			appctx.sound_fifo.snd_buf = malloc( appctx.sound_fifo.page_size * 16 * sizeof(short) );
-			memset((void*)appctx.sound_fifo.snd_buf,0,appctx.sound_fifo.page_size * 16 * sizeof(short));
-
-			appctx.audio_id_uplink = SDL_OpenAudioDevice(audio_id_to_name(audio_in_id, 1), 1, &fmt_up, &fmt_up, 0);
-			if ( appctx.audio_id_uplink < 0 )
-			{
-				fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
-			}
-			else
-			{
-				SDL_PauseAudioDevice( appctx.audio_id_uplink, SDL_FALSE );
-			}
-
-			low_pass_tx_Filter_init(&appctx.tx_fir);
-			appctx.uplink = 1;
-
-			create_audioin_thread(&appctx);
-		}
-
-		if(mic_mode)
-			appctx.audio_id = SDL_OpenAudioDevice(audio_id_to_name(audio_in_id, mic_mode), mic_mode, &fmt, &fmt, 0);
-		else
-			appctx.audio_id = SDL_OpenAudioDevice(audio_id_to_name(audio_out_id, mic_mode), mic_mode, &fmt, &fmt, 0);
-
-		if ( appctx.audio_id < 0 )
-		{
-			fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
-		}
-		else
-		{
-			SDL_PauseAudioDevice( appctx.audio_id, SDL_FALSE );
-		}
-
-		appctx.timer = SDL_AddTimer(30, video_tick, &appctx);
-
-		scriptctx = init_script((void *)&appctx, 0x00000000, (void*)&appctx.env);
-		if( scriptctx )
-		{
-			setOutputFunc_script( scriptctx, SCRIPT_CUI_affiche );
-
-			appctx.env = setEnvVar(appctx.env, "OUTFILE", "default_out.txt");
-
-			if(isOption(argc,argv,"outfile",(char*)&ofilename))
-			{
-				appctx.env = setEnvVar(appctx.env, "OUTFILE", ofilename);
-			}
-
-			execute_file_script( scriptctx, (char*)&filename );
-
-			deinit_script( scriptctx );
-		}
-#else
-		fprintf(stderr, "ERROR : No built-in SDL support !\n");
-#endif
-	}
-
-	if(isOption(argc,argv,"sdl",0)>0)
-	{
-#ifdef SDL_SUPPORT
-		outmode = OUTPUT_MODE_SDL;
-		vdt_ctx = vdt_init();
-
-		if(vdt_ctx)
-		{
-			mdm_init(&mdm_ctx);
-
-			SDL_Init(SDL_INIT_EVERYTHING);
-
-			appctx.keystate = SDL_GetKeyboardState(NULL);
-
-			appctx.window = SDL_CreateWindow( "Minitel", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, vdt_ctx->bmp_res_x, vdt_ctx->bmp_res_y, SDL_WINDOW_SHOWN );
-			if(!appctx.window)
-			{
-				fprintf(stderr, "ERROR : SDL_CreateWindow - %s\n",SDL_GetError());
-				return -1;
-			}
-
-			appctx.screen = SDL_GetWindowSurface( appctx.window );
-			if(!appctx.screen)
-			{
-				fprintf(stderr, "ERROR : SDL_GetWindowSurface - %s\n",SDL_GetError());
-				return -1;
-			}
-
-			appctx.mdm = &mdm_ctx;
-			appctx.vdt_ctx = vdt_ctx;
-
-			if(!(SDL_WasInit(SDL_INIT_AUDIO) & SDL_INIT_AUDIO))
-			{
-				if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
-				{
-					fprintf(stderr, "ERROR : SDL_INIT_AUDIO not initialized !\n");
-					return -1;
-				}
-			}
-
-			memset(&fmt,0,sizeof(fmt));
-			fmt.freq = mdm_ctx.sample_rate;
-			fmt.format = AUDIO_S16;
-			fmt.channels = 1;
-			fmt.samples = mdm_ctx.wave_size;
-			if(mic_mode)
-				fmt.callback = audio_in;
-			else
-				fmt.callback = audio_out;
-
-			fmt.userdata = &appctx;
-
-
-			if(isOption(argc,argv,"uplink",NULL)>0)
-			{
-				memset(&fmt_up,0,sizeof(fmt));
-				fmt_up.freq = mdm_ctx.sample_rate;
-				fmt_up.format = AUDIO_S16;
-				fmt_up.channels = 1;
-				fmt_up.samples = mdm_ctx.wave_size;
-				fmt_up.callback = audio_in;
-				fmt_up.userdata = &appctx;
-
-				appctx.audio_id_uplink = SDL_OpenAudioDevice(audio_id_to_name(audio_in_id, 1), 1, &fmt_up, &fmt_up, 0);
-				if ( appctx.audio_id_uplink < 0 )
-				{
-					fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
-				}
-				else
-				{
-					SDL_PauseAudioDevice( appctx.audio_id_uplink, SDL_FALSE );
-				}
-
-				low_pass_tx_Filter_init(&appctx.tx_fir);
-
-			}
-
-			if(mic_mode)
-				appctx.audio_id = SDL_OpenAudioDevice(audio_id_to_name(audio_in_id, mic_mode), mic_mode, &fmt, &fmt, 0);
-			else
-				appctx.audio_id = SDL_OpenAudioDevice(audio_id_to_name(audio_out_id, mic_mode), mic_mode, &fmt, &fmt, 0);
-
-			if ( appctx.audio_id < 0 )
-			{
-				fprintf(stderr, "SDL Sound Init error: %s\n", SDL_GetError());
-			}
-			else
-			{
-				SDL_PauseAudioDevice( appctx.audio_id, SDL_FALSE );
-			}
-
-			#ifndef EMSCRIPTEN_SUPPORT
-			appctx.timer = SDL_AddTimer(30, video_tick, &appctx);
-			#endif
-		}
+		SDL_app_loop( &appctx, audio_in_id, audio_out_id );
 #else
 		fprintf(stderr, "ERROR : No built-in SDL support !\n");
 #endif
@@ -1210,12 +1195,6 @@ int main(int argc, char* argv[])
 	}
 
 	// Animation generator
-	if(isOption(argc,argv,"uplink",NULL)>0)
-	{
-		appctx.uplink = 1;
-	}
-
-	// Animation generator
 	if(isOption(argc,argv,"ani",NULL)>0)
 	{
 		mdm_init(&mdm_ctx);
@@ -1242,7 +1221,7 @@ int main(int argc, char* argv[])
 				#endif
 
 				#ifdef SDL_SUPPORT
-				if(appctx.uplink)
+				if(appctx.io_cfg_flags & FLAGS_SDL_IO_AUDIOIN)
 				{
 					appctx.snd_event = createevent();
 
@@ -1322,27 +1301,6 @@ int main(int argc, char* argv[])
 			vdt_deinit(vdt_ctx);
 		}
 	}
-
-#ifdef SDL_SUPPORT
-	if(appctx.window)
-	{
-		SDL_DestroyWindow( appctx.window );
-
-		SDL_RemoveTimer( appctx.timer );
-
-		SDL_PauseAudioDevice( appctx.audio_id, SDL_TRUE );
-
-		SDL_CloseAudioDevice( appctx.audio_id );
-
-		if(appctx.uplink)
-		{
-			SDL_PauseAudioDevice( appctx.audio_id_uplink, SDL_TRUE );
-
-			SDL_CloseAudioDevice( appctx.audio_id_uplink );
-		}
-	}
-	SDL_Quit();
-#endif
 
 	if( (isOption(argc,argv,"help",0)<=0) &&
 		(isOption(argc,argv,"vdt",0)<=0)  &&

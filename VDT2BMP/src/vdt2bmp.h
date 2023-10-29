@@ -42,23 +42,27 @@ typedef struct snd_fifo_
 }snd_fifo;
 #endif
 
+#define FLAGS_SDL_IO_SCREEN   (0x1<<0)
+#define FLAGS_SDL_IO_AUDIOIN  (0x1<<1)
+#define FLAGS_SDL_IO_AUDIOOUT (0x1<<2)
+
 typedef struct app_ctx_
 {
 	videotex_ctx * vdt_ctx;
 	modem_ctx *mdm;
+	void * srvscript;
+	char script_file[512];
+	char outfile_file[512];
+
+	uint32_t io_cfg_flags;
+
 	int verbose;
 	int quit;
-	int fir_en;
-	int uplink;
+
 	low_pass_tx_Filter tx_fir;
 	band_pass_rx_Filter rx_fir;
 #ifdef SDL_SUPPORT
-	SDL_Surface *screen;
-	SDL_TimerID timer;
-	SDL_Window* window;
 	const unsigned char * keystate;
-	int audio_id;
-	int audio_id_uplink;
 	EVENT_HANDLE * snd_event;
 	snd_fifo sound_fifo;
 #endif

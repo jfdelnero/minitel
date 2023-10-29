@@ -42,11 +42,6 @@
 #include <windows.h>
 #endif
 
-#ifdef SDL_SUPPORT
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_audio.h>
-#endif
-
 #include "env.h"
 
 #include "cache.h"
