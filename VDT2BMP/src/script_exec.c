@@ -1894,8 +1894,10 @@ static int cmd_field_edit( script_ctx * ctx, char * line)
 				return 0x1346;
 			break;
 
+			case 0x1353: // Connexion
+			case 0x1349: // Connexion/Fin
 			case 0x137F: // Timeout
-				return 0x137F;
+				return code;
 			break;
 
 			case 0x1345: // Annulation
