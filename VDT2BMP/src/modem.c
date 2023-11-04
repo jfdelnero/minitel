@@ -179,11 +179,11 @@ int mdm_prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte)
 	{
 		switch(mdm->serial_parity)
 		{
-			case 1: // odd
+			case 1: // even parity - make sure that numbers of '1' bits is even. (data + parity bits included)
 				tx_buffer[j++] = one_bits & 1;
 			break;
 
-			case 2: // even
+			case 2: // odd parity - make sure that numbers of '1' bits is odd. (data + parity bits included)
 				tx_buffer[j++] = (one_bits & 1) ^ 1;
 			break;
 		}
@@ -310,7 +310,7 @@ int mdm_serial_rx(modem_ctx *mdm, serial_rx_ctx * rx_ctx, int state)
 		case 2: // Parity
 			switch(mdm->serial_parity)
 			{
-				case 1: // odd
+				case 1: // even parity - check that the total numbers or '1' are even (data + parity bits included.)
 					if( (rx_ctx->serial_rx_parbitcnt & 1)  != (state&1) )
 					{
 						// bad parity
@@ -320,7 +320,7 @@ int mdm_serial_rx(modem_ctx *mdm, serial_rx_ctx * rx_ctx, int state)
 					}
 				break;
 
-				case 2: // even
+				case 2: // odd parity - check that the total numbers or '1' are odd (data + parity bits included.)
 					if( (rx_ctx->serial_rx_parbitcnt & 1)  != ((state^1)&1) )
 					{
 						// bad parity

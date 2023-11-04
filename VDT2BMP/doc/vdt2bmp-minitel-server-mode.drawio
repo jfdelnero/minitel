@@ -1,6 +1,6 @@
-<mxfile host="app.diagrams.net" modified="2023-11-02T20:22:32.237Z" agent="Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/119.0" etag="GpFiPo0bUd5b7saSF44A" version="22.0.8" type="device">
+<mxfile host="app.diagrams.net" modified="2023-11-04T11:13:02.935Z" agent="Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/119.0" etag="V5xCEQQUOVhb0ZYlMwZk" version="22.0.8" type="device">
   <diagram name="Page-1" id="Cvw13T8zOzfiuNnUB_ZH">
-    <mxGraphModel dx="1434" dy="738" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="3300" pageHeight="4681" math="0" shadow="0">
+    <mxGraphModel dx="2607" dy="1342" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="3300" pageHeight="4681" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -1066,14 +1066,14 @@
             <mxPoint x="930" y="680" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="a6iNXgdfhpA_qVPRgY3A-159" value="1200 Baud, 7bits, odd parity" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontStyle=1" parent="1" vertex="1">
-          <mxGeometry x="1811" y="1413" width="180" height="30" as="geometry" />
+        <mxCell id="a6iNXgdfhpA_qVPRgY3A-159" value="1200 Baud, 7bits, even parity" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="1806" y="1413" width="190" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="a6iNXgdfhpA_qVPRgY3A-160" value="75 Baud, 7bits, odd parity" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontStyle=1" parent="1" vertex="1">
+        <mxCell id="a6iNXgdfhpA_qVPRgY3A-160" value="75 Baud, 7bits, even parity" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontStyle=1" parent="1" vertex="1">
           <mxGeometry x="1816.5" y="861" width="170" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="a6iNXgdfhpA_qVPRgY3A-161" value="1200 Baud, 7bits, odd parity" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontStyle=1" parent="1" vertex="1">
-          <mxGeometry x="1810" y="570" width="180" height="30" as="geometry" />
+        <mxCell id="a6iNXgdfhpA_qVPRgY3A-161" value="1200 Baud, 7bits, even parity" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="1805" y="570" width="190" height="30" as="geometry" />
         </mxCell>
         <mxCell id="a6iNXgdfhpA_qVPRgY3A-163" value="470 Ohms" style="pointerEvents=1;verticalLabelPosition=bottom;shadow=0;dashed=0;align=center;html=1;verticalAlign=top;shape=mxgraph.electrical.resistors.resistor_1;" parent="1" vertex="1">
           <mxGeometry x="470" y="670" width="100" height="20" as="geometry" />
