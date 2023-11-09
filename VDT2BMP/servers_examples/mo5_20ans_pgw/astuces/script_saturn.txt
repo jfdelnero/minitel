@@ -1,6 +1,6 @@
 
 # Config variables codes touches
-call "mo5_20ans_pgw/codes_touches.txt"
+call "codes_touches.txt"
 
 # Effacement écran
 
@@ -8,7 +8,7 @@ tx c:0x0C
 
 # Affichage de la page
 
-send_file mo5_20ans_pgw/astuces/saturn.vdt
+send_file astuces/saturn.vdt
 
 # Purge buffer clavier
 
@@ -37,11 +37,11 @@ goto loop_clavier
 # ---------------------------------------------------------------
 go_envoi:
 
-if $TXT_AREA == 4 then set SCRIPTPATH "mo5_20ans_pgw/astuces/saturn/script_night.txt"
-if $TXT_AREA == 3 then set SCRIPTPATH "mo5_20ans_pgw/astuces/saturn/script_sega_rally.txt"
-if $TXT_AREA == 2 then set SCRIPTPATH "mo5_20ans_pgw/astuces/saturn/script_die_hard_trilogy.txt"
-if $TXT_AREA == 5 then set SCRIPTPATH "mo5_20ans_pgw/astuces/saturn/script_virtua_fighter_2.txt"
-if $TXT_AREA == 1 then set SCRIPTPATH "mo5_20ans_pgw/astuces/saturn/script_burning_rangers.txt"
+if $TXT_AREA == 4 then set SCRIPTPATH "astuces/saturn/script_night.txt"
+if $TXT_AREA == 3 then set SCRIPTPATH "astuces/saturn/script_sega_rally.txt"
+if $TXT_AREA == 2 then set SCRIPTPATH "astuces/saturn/script_die_hard_trilogy.txt"
+if $TXT_AREA == 5 then set SCRIPTPATH "astuces/saturn/script_virtua_fighter_2.txt"
+if $TXT_AREA == 1 then set SCRIPTPATH "astuces/saturn/script_burning_rangers.txt"
 
 set TXT_SELECT ""
 
@@ -54,13 +54,13 @@ return
 # ---------------------------------------------------------------
 go_vers_sommaire:
 
-set SCRIPTPATH "mo5_20ans_pgw/accueil/script.txt"
+set SCRIPTPATH "accueil/script.txt"
 
 return
 
 # ---------------------------------------------------------------
 go_vers_page_precedente:
 
-set SCRIPTPATH "mo5_20ans_pgw/astuces/script.txt"
+set SCRIPTPATH "astuces/script.txt"
 
 return

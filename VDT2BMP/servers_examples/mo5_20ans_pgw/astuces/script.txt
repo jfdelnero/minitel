@@ -1,6 +1,6 @@
 
 # Config variables codes touches
-call "mo5_20ans_pgw/codes_touches.txt"
+call "codes_touches.txt"
 
 # Effacement écran
 
@@ -8,7 +8,7 @@ tx c:0x0C
 
 # Affichage de la page
 
-send_file mo5_20ans_pgw/astuces/astuces.vdt
+send_file astuces/astuces.vdt
 
 # Purge buffer clavier
 
@@ -38,13 +38,13 @@ goto loop_clavier
 
 go_envoi:
 
-if $TXT_AREA == 1 then set SCRIPTPATH "mo5_20ans_pgw/astuces/script_megadrive.txt"
-if $TXT_AREA == 2 then set SCRIPTPATH "mo5_20ans_pgw/astuces/script_snes.txt"
-if $TXT_AREA == 3 then set SCRIPTPATH "mo5_20ans_pgw/astuces/script_pcengine.txt"
-if $TXT_AREA == 4 then set SCRIPTPATH "mo5_20ans_pgw/astuces/script_saturn.txt"
-if $TXT_AREA == 5 then set SCRIPTPATH "mo5_20ans_pgw/astuces/script_ps1.txt"
-if $TXT_AREA == 6 then set SCRIPTPATH "mo5_20ans_pgw/astuces/script_n64.txt"
-if $TXT_AREA == 7 then set SCRIPTPATH "mo5_20ans_pgw/astuces/script_dreamcast.txt"
+if $TXT_AREA == 1 then set SCRIPTPATH "astuces/script_megadrive.txt"
+if $TXT_AREA == 2 then set SCRIPTPATH "astuces/script_snes.txt"
+if $TXT_AREA == 3 then set SCRIPTPATH "astuces/script_pcengine.txt"
+if $TXT_AREA == 4 then set SCRIPTPATH "astuces/script_saturn.txt"
+if $TXT_AREA == 5 then set SCRIPTPATH "astuces/script_ps1.txt"
+if $TXT_AREA == 6 then set SCRIPTPATH "astuces/script_n64.txt"
+if $TXT_AREA == 7 then set SCRIPTPATH "astuces/script_dreamcast.txt"
 
 set TXT_SELECT ""
 
@@ -57,7 +57,7 @@ return
 # ---------------------------------------------------------------
 go_vers_sommaire:
 
-set SCRIPTPATH "mo5_20ans_pgw/accueil/script.txt"
+set SCRIPTPATH "accueil/script.txt"
 
 return
 

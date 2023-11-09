@@ -1,6 +1,6 @@
 
 # Config variables codes touches
-call "mo5_20ans_pgw/codes_touches.txt"
+call "codes_touches.txt"
 
 # Effacement écran
 
@@ -8,7 +8,7 @@ tx c:0x0C
 
 # Affichage de la page
 
-send_file mo5_20ans_pgw/inscription/inscription.vdt
+send_file inscription/inscription.vdt
 
 # purge buffer clavier
 
@@ -165,7 +165,7 @@ tx c:0x30
 tx s:"                                      "
 
 # Retour Sommaire !
-set SCRIPTPATH "mo5_20ans_pgw/accueil/script.txt"
+set SCRIPTPATH "accueil/script.txt"
 
 # Changement de page
 return
@@ -173,6 +173,6 @@ return
 # ---------------------------------------------------------------s
 go_vers_sommaire:
 
-set SCRIPTPATH "mo5_20ans_pgw/accueil/script.txt"
+set SCRIPTPATH "accueil/script.txt"
 
 return

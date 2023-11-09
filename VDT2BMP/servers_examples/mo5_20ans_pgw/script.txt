@@ -2,7 +2,7 @@
 print Start server !
 
 # Config variables codes touches
-call "mo5_20ans_pgw/codes_touches.txt"
+call "codes_touches.txt"
 
 #  Boucle de changement de page
 
@@ -33,7 +33,7 @@ pause 3000
 
 # page par défaut
 
-set SCRIPTPATH "mo5_20ans_pgw/accueil/script.txt"
+set SCRIPTPATH "accueil/script.txt"
 
 # clear de la 1 ligne
 tx c:0x1F

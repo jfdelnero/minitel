@@ -1,6 +1,6 @@
 
 # Config variables codes touches
-call "mo5_20ans_pgw/codes_touches.txt"
+call "codes_touches.txt"
 
 # Effacement écran
 
@@ -16,31 +16,31 @@ call . print_message
 
 loop_slideshow:
 
-send_file "mo5_20ans_pgw/img/logo_20_ans_mo5.vdt" NOWAIT
+send_file "img/logo_20_ans_mo5.vdt" NOWAIT
 call . print_message
 
 call . pause_key
 if $KEYEVENT == 1 then goto go_sommaire
 
-send_file "mo5_20ans_pgw/img/Approchez_vous.vdt" NOWAIT
+send_file "img/Approchez_vous.vdt" NOWAIT
 call . print_message
 
 call . pause_key
 if $KEYEVENT == 1 then goto go_sommaire
 
-send_file "mo5_20ans_pgw/img/coucou.vdt" NOWAIT
+send_file "img/coucou.vdt" NOWAIT
 call . print_message
 
 call . pause_key
 if $KEYEVENT == 1 then goto go_sommaire
 
-send_file "mo5_20ans_pgw/img/pirate.vdt" NOWAIT
+send_file "img/pirate.vdt" NOWAIT
 call . print_message
 
 call . pause_key
 if $KEYEVENT == 1 then goto go_sommaire
 
-send_file "mo5_20ans_pgw/img/visage1.vdt" NOWAIT
+send_file "img/visage1.vdt" NOWAIT
 call . print_message
 
 call . pause_key
@@ -66,7 +66,7 @@ tx s:"                                     "
 
 tx c:0x0C
 
-set SCRIPTPATH "mo5_20ans_pgw/accueil/script.txt"
+set SCRIPTPATH "accueil/script.txt"
 
 return
 

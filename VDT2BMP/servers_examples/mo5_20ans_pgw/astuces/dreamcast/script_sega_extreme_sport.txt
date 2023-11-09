@@ -1,6 +1,6 @@
 
 # Config variables codes touches
-call "mo5_20ans_pgw/codes_touches.txt"
+call "codes_touches.txt"
 
 # Effacement écran
 
@@ -8,7 +8,7 @@ tx c:0x0C
 
 # Affichage de la page
 
-send_file mo5_20ans_pgw/astuces/dreamcast/sega_extreme_sport.vdt
+send_file astuces/dreamcast/sega_extreme_sport.vdt
 
 # Purge buffer clavier
 
@@ -37,8 +37,8 @@ goto loop_clavier
 # ---------------------------------------------------------------
 go_envoi:
 
-#if $TXT_AREA == 1 then set SCRIPTPATH "mo5_20ans_pgw/astuces/script_megadrive.txt"
-#if $TXT_AREA == 2 then set SCRIPTPATH "mo5_20ans_pgw/astuces/script_snes.txt"
+#if $TXT_AREA == 1 then set SCRIPTPATH "astuces/script_megadrive.txt"
+#if $TXT_AREA == 2 then set SCRIPTPATH "astuces/script_snes.txt"
 
 set TXT_SELECT ""
 
@@ -51,7 +51,7 @@ return
 # ---------------------------------------------------------------
 go_vers_sommaire:
 
-set SCRIPTPATH "mo5_20ans_pgw/accueil/script.txt"
+set SCRIPTPATH "accueil/script.txt"
 
 return
 
@@ -59,7 +59,7 @@ return
 # ---------------------------------------------------------------
 go_vers_page_precedente:
 
-set SCRIPTPATH "mo5_20ans_pgw/astuces/script_dreamcast.txt"
+set SCRIPTPATH "astuces/script_dreamcast.txt"
 
 return
 
