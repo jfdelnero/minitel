@@ -1,0 +1,27 @@
+#
+# Serveur Minitel
+# 20 Ans MO5 - PGW 2023
+#
+# Fichiers serveur utilisés pour les Minitels présents pendant
+# la Paris Games Week 2023 du 1er au 5 novembre sur le stand
+# de l'association MO5 au parc des expositions porte de versailles.
+#
+# Contenu des pages / Rédactionnel :
+#
+# Alexandre Darras
+# Philippe Dubois
+#
+# Solution serveur / support script :
+#
+# Jean-François Del Nero
+#
+
+#
+# Pour démarrer le serveur, il faut se placer dans le répertoire "mo5_20ans_pgw" et lancer cette commande :
+#
+# vdt2bmp.exe -server:script.txt -outfile:inscriptions.csv -timeout:120
+# (Windows)
+#
+# vdt2bmp -server:script.txt -outfile:inscriptions.csv -timeout:120
+# (Linux)
+#

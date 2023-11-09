@@ -1,0 +1,37 @@
+
+# Config variables codes touches
+call "mo5_20ans_pgw/codes_touches.txt"
+
+# Effacement écran
+tx c:0x0C
+
+# Beep
+#tx c:0x07
+#tx s:"TODO: Page(s) Informations"
+
+# Affichage de la page
+send_file mo5_20ans_pgw/informations/page.vdt
+
+# Purge buffer clavier
+purge_rx_buffer
+
+loop_clavier:
+
+# attente clavier
+wait_key
+
+if $LASTDATA == $T_SOMMAIRE then goto go_vers_sommaire
+if $LASTDATA == $T_SUITE then goto go_vers_sommaire
+if $LASTDATA == $T_RETOUR then goto go_vers_sommaire
+if $LASTDATA == $T_TIMEOUT  then goto go_vers_sommaire
+if $LASTDATA == $T_CONNEXION then goto go_vers_sommaire
+if $LASTDATA == $T_CONNEXIONFIN then goto go_vers_sommaire
+
+goto loop_clavier
+
+#-------------------------------------------
+go_vers_sommaire:
+
+set SCRIPTPATH "mo5_20ans_pgw/accueil/script.txt"
+
+return

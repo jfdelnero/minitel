@@ -1,0 +1,125 @@
+
+# Config variables codes touches
+call "mo5_20ans_pgw/codes_touches.txt"
+
+# Effacement écran
+
+tx c:0x0C
+$MESSAGE_OFFSET = 0
+
+# purge buffer clavier
+purge_rx_buffer
+
+#-----------------------------------------
+
+call . print_message
+
+loop_slideshow:
+
+send_file "mo5_20ans_pgw/img/logo_20_ans_mo5.vdt" NOWAIT
+call . print_message
+
+call . pause_key
+if $KEYEVENT == 1 then goto go_sommaire
+
+send_file "mo5_20ans_pgw/img/Approchez_vous.vdt" NOWAIT
+call . print_message
+
+call . pause_key
+if $KEYEVENT == 1 then goto go_sommaire
+
+send_file "mo5_20ans_pgw/img/coucou.vdt" NOWAIT
+call . print_message
+
+call . pause_key
+if $KEYEVENT == 1 then goto go_sommaire
+
+send_file "mo5_20ans_pgw/img/pirate.vdt" NOWAIT
+call . print_message
+
+call . pause_key
+if $KEYEVENT == 1 then goto go_sommaire
+
+send_file "mo5_20ans_pgw/img/visage1.vdt" NOWAIT
+call . print_message
+
+call . pause_key
+if $KEYEVENT == 1 then goto go_sommaire
+
+goto loop_slideshow
+
+#-----------------------------------------
+
+go_sommaire:
+
+purge_rx_buffer
+purge_tx_buffer
+
+tx c:0x0C
+tx c:0x0C
+
+tx c:0x1F
+tx c:0x30
+tx c:0x30
+
+tx s:"                                     "
+
+tx c:0x0C
+
+set SCRIPTPATH "mo5_20ans_pgw/accueil/script.txt"
+
+return
+
+#-----------------------------------------
+pause_key:
+
+$CNTLOOP = 0
+
+pause_key_loop:
+
+is_rx_buffer_empty
+if $LASTERROR == 0 then goto check_key
+
+pause 20
+
+$CNTLOOP = $CNTLOOP + 1
+
+if $CNTLOOP > 1000 then goto exit_loop
+
+goto pause_key_loop
+
+check_key:
+wait_key
+if $LASTDATA == $T_TIMEOUT then goto pause_key_loop
+goto exit_loop_key
+
+exit_loop:
+$KEYEVENT = 0
+return
+
+exit_loop_key:
+$KEYEVENT = 1
+return
+
+#-----------------------------------------
+
+print_message:
+
+$XPOS = 0x30 + $MESSAGE_OFFSET
+
+tx c:0x1F
+tx c:0x30
+tx c:0x30
+
+$MESSAGE_OFFSET = $MESSAGE_OFFSET + 1
+if $MESSAGE_OFFSET > 14 then $MESSAGE_OFFSET = 0
+
+$PAD_CNT = 0
+loop_pad:
+tx s:" "
+$PAD_CNT = $PAD_CNT + 1
+if $PAD_CNT < $MESSAGE_OFFSET then goto loop_pad
+
+tx s:"Appuyez sur une touche !             "
+
+return

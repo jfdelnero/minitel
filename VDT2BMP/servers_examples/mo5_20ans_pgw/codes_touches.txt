@@ -1,0 +1,25 @@
+
+# Definition des codes touches spéciales
+
+# 13 53 : Connexion
+# 13 46 : Sommaire
+# 13 45 : Annulation
+# 13 42 : Retour
+# 13 43 : Repetition
+# 13 44 : Guide
+# 13 47 : Correction
+# 13 48 : Suite
+# 13 41 : Envoi
+# 13 49 : Connexion Fin
+
+set T_CONNEXION    0x1353
+set T_SOMMAIRE     0x1346
+set T_ANNULATION   0x1345
+set T_RETOUR       0x1342
+set T_REPETITION   0x1343
+set T_GUIDE        0x1344
+set T_CORRECTION   0x1347
+set T_SUITE        0x1348
+set T_ENVOI        0x1341
+set T_CONNEXIONFIN 0x1349
+set T_TIMEOUT      0x137F

@@ -1,0 +1,54 @@
+
+print Start server !
+
+# Config variables codes touches
+call "mo5_20ans_pgw/codes_touches.txt"
+
+#  Boucle de changement de page
+
+# Attente de la connexion du Minitel...
+boucle_attente_porteuse:
+print Attente porteuse...
+pause 1000
+rx_carrier_present
+if $LASTERROR == 0 then goto boucle_attente_porteuse
+
+print Presence porteuse !
+
+# Effacement écran
+
+tx c:0x0C   # effacement écran
+tx c:0x07   # beep
+tx s:" :) " # happy !
+tx c:0x0D0A0A0A # down * 3
+
+tx s:"VDT2BMP "
+tx s:$VERSION # version
+tx c:0x0D0A0A # down *2
+tx s:"-- Serveur Minitel Audio --"
+tx c:0x0D0A0A # down *2
+tx s:"https://github.com/jfdelnero/minitel/"
+
+pause 3000
+
+# page par défaut
+
+set SCRIPTPATH "mo5_20ans_pgw/accueil/script.txt"
+
+# clear de la 1 ligne
+tx c:0x1F
+tx c:0x30
+tx c:0x30
+tx s:"                                     "
+
+boucle_serveur:
+
+call $SCRIPTPATH
+
+# porteuse perdue ?
+rx_carrier_present
+if $LASTERROR == 0 then goto boucle_attente_porteuse
+
+if $SCRIPTPATH != 0xFFFFFFFF then goto boucle_serveur
+
+print Server stopped !

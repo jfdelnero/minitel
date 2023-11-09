@@ -1,0 +1,63 @@
+
+# Config variables codes touches
+call "mo5_20ans_pgw/codes_touches.txt"
+
+# Effacement écran
+
+tx c:0x0C
+
+# Affichage de la page
+
+send_file mo5_20ans_pgw/astuces/n64/mario_kart_64.vdt
+
+# Purge buffer clavier
+
+purge_rx_buffer
+
+# R.A.Z de la variable page.
+set SCRIPTPATH 0xFFFFFFFF
+set TXT_SELECT ""
+
+# attente clavier
+loop_clavier:
+
+field_edit 27 22 28 22 2 $TXT_SELECT
+set LASTCODE $LASTERROR
+set TXT_SELECT $TXT_AREA
+
+if $LASTCODE == $T_SOMMAIRE then goto go_vers_page_precedente
+if $LASTCODE == $T_RETOUR   then goto go_vers_page_precedente
+if $LASTCODE == $T_ENVOI    then goto go_envoi
+if $LASTCODE == $T_TIMEOUT  then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXION then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXIONFIN then goto go_vers_sommaire
+
+goto loop_clavier
+
+# ---------------------------------------------------------------
+go_envoi:
+
+#if $TXT_AREA == 1 then set SCRIPTPATH "mo5_20ans_pgw/astuces/script_megadrive.txt"
+#if $TXT_AREA == 2 then set SCRIPTPATH "mo5_20ans_pgw/astuces/script_snes.txt"
+
+set TXT_SELECT ""
+
+# Nouvelle page ? Si non on boucle...
+if $SCRIPTPATH == 0xFFFFFFFF then goto loop_clavier
+
+# Changement de page
+return
+
+# ---------------------------------------------------------------
+go_vers_sommaire:
+
+set SCRIPTPATH "mo5_20ans_pgw/accueil/script.txt"
+
+return
+
+# ---------------------------------------------------------------
+go_vers_page_precedente:
+
+set SCRIPTPATH "mo5_20ans_pgw/astuces/script_n64.txt"
+
+return

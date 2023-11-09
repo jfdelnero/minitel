@@ -1,0 +1,178 @@
+
+# Config variables codes touches
+call "mo5_20ans_pgw/codes_touches.txt"
+
+# Effacement écran
+
+tx c:0x0C
+
+# Affichage de la page
+
+send_file mo5_20ans_pgw/inscription/inscription.vdt
+
+# purge buffer clavier
+
+purge_rx_buffer
+
+# R.A.Z de la variable page.
+set SCRIPTPATH 0xFFFFFFFF
+
+set TXT_NOM ""
+set TXT_PRENOM ""
+set TXT_PSEUDO ""
+set TXT_DATE ""
+set TXT_EMAIL ""
+set TXT_MOTIVATION ""
+set TXT_CONNU ""
+
+# attente clavier
+loop_clavier:
+
+saisie_nom:
+# Nom
+field_edit 6 7 39 7 33 $TXT_NOM
+set LASTCODE $LASTERROR
+set TXT_NOM $TXT_AREA
+if $LASTCODE == $T_RETOUR then goto saisie_nom
+if $LASTCODE == $T_SOMMAIRE then goto go_vers_sommaire
+if $LASTCODE == $T_SUITE then goto saisie_prenom
+if $LASTCODE == $T_TIMEOUT then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXION then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXIONFIN then goto go_vers_sommaire
+goto saisie_nom
+
+saisie_prenom:
+# Prenom
+field_edit 9 8 39 8 30 $TXT_PRENOM
+set LASTCODE $LASTERROR
+set TXT_PRENOM $TXT_AREA
+if $LASTCODE == $T_RETOUR then goto saisie_nom
+if $LASTCODE == $T_SOMMAIRE then goto go_vers_sommaire
+if $LASTCODE == $T_SUITE then goto saisie_pseudo
+if $LASTCODE == $T_TIMEOUT then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXION then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXIONFIN then goto go_vers_sommaire
+goto saisie_prenom
+
+saisie_pseudo:
+# Pseudo
+field_edit 9 9 39 9 30 $TXT_PSEUDO
+set LASTCODE $LASTERROR
+set TXT_PSEUDO $TXT_AREA
+if $LASTCODE == $T_RETOUR then goto saisie_prenom
+if $LASTCODE == $T_SOMMAIRE then goto go_vers_sommaire
+if $LASTCODE == $T_SUITE then goto saisie_date
+if $LASTCODE == $T_TIMEOUT then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXION then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXIONFIN then goto go_vers_sommaire
+goto saisie_pseudo
+
+saisie_date:
+# Date
+field_edit 19 10 28 10 9 $TXT_DATE
+set LASTCODE $LASTERROR
+set TXT_DATE $TXT_AREA
+if $LASTCODE == $T_RETOUR then goto saisie_pseudo
+if $LASTCODE == $T_SOMMAIRE then goto go_vers_sommaire
+if $LASTCODE == $T_SUITE then goto saisie_email
+if $LASTCODE == $T_TIMEOUT then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXION then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXIONFIN then goto go_vers_sommaire
+goto saisie_date
+
+saisie_email:
+# Email
+field_edit 9 11 39 11 30 $TXT_EMAIL
+set LASTCODE $LASTERROR
+set TXT_EMAIL $TXT_AREA
+if $LASTCODE == $T_RETOUR then goto saisie_date
+if $LASTCODE == $T_SOMMAIRE then goto go_vers_sommaire
+if $LASTCODE == $T_SUITE then goto saisie_motivation
+if $LASTCODE == $T_TIMEOUT then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXION then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXIONFIN then goto go_vers_sommaire
+goto saisie_email
+
+saisie_motivation:
+# Motivation
+field_edit 1 13 39 18 234 $TXT_MOTIVATION
+set LASTCODE $LASTERROR
+set TXT_MOTIVATION $TXT_AREA
+if $LASTCODE == $T_RETOUR then goto saisie_email
+if $LASTCODE == $T_SOMMAIRE then goto go_vers_sommaire
+if $LASTCODE == $T_SUITE then goto saisie_connu
+if $LASTCODE == $T_TIMEOUT then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXION then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXIONFIN then goto go_vers_sommaire
+goto saisie_motivation
+
+saisie_connu:
+# Motivation
+field_edit 1 20 39 21 80 $TXT_CONNU
+set LASTCODE $LASTERROR
+set TXT_CONNU $TXT_AREA
+if $LASTCODE == $T_RETOUR then goto saisie_motivation
+if $LASTCODE == $T_SOMMAIRE then goto go_vers_sommaire
+if $LASTCODE == $T_ENVOI then goto validation
+if $LASTCODE == $T_TIMEOUT then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXION then goto go_vers_sommaire
+if $LASTCODE == $T_CONNEXIONFIN then goto go_vers_sommaire
+goto saisie_connu
+
+validation:
+# Saut Première ligne
+tx c:0x1F
+tx c:0x30
+tx c:0x30
+
+tx s:"ENVOI: Valider, CORRECTION: Corriger"
+
+rx_char
+if $LASTDATA != 0x13 then goto validation
+
+rx_char
+
+# Saut Première ligne
+tx c:0x1F
+tx c:0x30
+tx c:0x30
+
+tx s:"                                     "
+
+if $LASTDATA == 0x47 then goto loop_clavier # correction
+if $LASTDATA == 0x41 then goto enregistrement
+
+goto validation
+
+enregistrement:
+print $OUTFILE
+
+getcurdate
+
+writetocsvfile $OUTFILE $DATETIME $TXT_NOM $TXT_PRENOM $TXT_PSEUDO $TXT_DATE $TXT_EMAIL $TXT_MOTIVATION $TXT_CONNU
+
+tx c:0x1F
+tx c:0x30
+tx c:0x30
+
+tx s:"Bienvenue chez MO5.COM ! :)           "
+pause 3000
+
+tx c:0x1F
+tx c:0x30
+tx c:0x30
+
+tx s:"                                      "
+
+# Retour Sommaire !
+set SCRIPTPATH "mo5_20ans_pgw/accueil/script.txt"
+
+# Changement de page
+return
+
+# ---------------------------------------------------------------s
+go_vers_sommaire:
+
+set SCRIPTPATH "mo5_20ans_pgw/accueil/script.txt"
+
+return
