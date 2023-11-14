@@ -1936,6 +1936,324 @@ error:
 	return SCRIPT_CMD_BAD_PARAMETER;
 }
 
+static int txt_area_add_char( script_ctx * ctx, edit_area * area, unsigned short code, int cnt )
+{
+	if( is_minitel_alphanum(code) || code == '\n' )
+	{
+		if(
+			( area->col <= ( area->x_end_area - area->x_start_area ) ) &&
+			( area->row <= ( area->y_end_area - area->y_start_area ) )
+		)
+		{
+			//area->field_buf[area->cur_len++] = code & 0xFF;
+
+			if ( code == '\n' )
+			{
+				if( area->row <= ( area->y_end_area - area->y_start_area ) )
+				{
+					area->row++;
+					if(!cnt)
+					{
+						send_char(ctx, 0x1F);
+						send_char(ctx, area->y_start_area + area->row);
+						send_char(ctx, area->x_start_area);
+					}
+					area->col = 0;
+				}
+			}
+			else
+			{
+				if(!cnt)
+					send_char(ctx, code & 0xFF);
+
+				area->col++;
+
+				if( area->col > ( area->x_end_area - area->x_start_area ) )
+				{
+					if( area->row <= ( area->y_end_area - area->y_start_area ) )
+					{
+						area->row++;
+						if(!cnt)
+						{
+							send_char(ctx, 0x1F);
+							send_char(ctx, area->y_start_area + area->row);
+							send_char(ctx, area->x_start_area);
+						}
+						area->col = 0;
+					}
+					else
+					{
+						if(!cnt)
+						{
+							send_char(ctx, 0x1F);
+							send_char(ctx, area->y_end_area);
+							send_char(ctx, area->x_end_area);
+						}
+					}
+				}
+			}
+
+			return 0;
+		}
+
+		return 1;
+	}
+#ifdef DEBUG
+	printf("col:%d row:%d len:%d\n", area->col, area->row, area->cur_len);
+#endif
+
+	return 0;
+}
+
+static void txt_clear_area( script_ctx * ctx, edit_area * area )
+{
+	int y;
+
+	for(y=area->y_start_area; y<=( area->y_end_area );y++)
+	{
+		send_char(ctx, 0x1F);
+		send_char(ctx, y);
+		send_char(ctx, area->x_start_area);
+		send_char(ctx, ' ');
+		send_char(ctx, 0x12); // Repeat
+		send_char(ctx, 0x40 + ( area->x_end_area - area->x_start_area ) );
+	}
+
+	send_char(ctx, 0x1F);
+	send_char(ctx, area->y_start_area);
+	send_char(ctx, area->x_start_area);
+
+	area->col = 0;
+	area->row = 0;
+}
+
+static void txt_print_pagenb_area( script_ctx * ctx, edit_area * area, int page, int cnt )
+{
+	int i;
+	char page_str[128];
+
+	//"01/02"
+	send_char(ctx, 0x1F);
+	send_char(ctx, area->y_end_area);
+	send_char(ctx, (area->x_end_area - 5) + 1);
+
+	sprintf(page_str,"%.2d/%.2d", page,cnt);
+
+	i = 0;
+	while(page_str[i])
+	{
+		send_char(ctx, page_str[i]);
+		i++;
+	}
+
+	send_char(ctx, 0x1F);
+	send_char(ctx, area->y_start_area);
+	send_char(ctx, area->x_start_area);
+}
+
+static int cmd_send_txt( script_ctx * ctx, char * line)
+{
+	char tmp_buf[DEFAULT_BUFLEN];
+	char file_path[DEFAULT_BUFLEN];
+	int pages_offset[50];
+	int page_idx;
+	int page_cnt;
+	int offset;
+	int i=0;
+	int ret,waitempty;
+	unsigned char c;
+	unsigned short code;
+	edit_area area;
+	file_cache fc;
+	app_ctx * appctx;
+
+	appctx = (app_ctx *)ctx->app_ctx;
+
+	page_cnt = 0;
+	waitempty = 1;
+	offset = 0;
+	memset(&area, 0, sizeof(edit_area));
+	memset(&pages_offset,0, sizeof(pages_offset));
+
+	// send_txt x_start_area y_start_area x_end_area y_end_area file_path
+
+	i = get_param_str( ctx, line, 1, tmp_buf );
+	if(i<0)
+		goto error;
+	area.x_start_area = str_to_int(tmp_buf) + 0x40 + 1;
+
+	i = get_param_str( ctx, line, 2, tmp_buf );
+	if(i<0)
+		goto error;
+	area.y_start_area = str_to_int(tmp_buf) + 0x40;
+
+	i = get_param_str( ctx, line, 3, tmp_buf );
+	if(i<0)
+		goto error;
+	area.x_end_area = str_to_int(tmp_buf) + 0x40 + 1;
+
+	i = get_param_str( ctx, line, 4, tmp_buf );
+	if(i<0)
+		goto error;
+	area.y_end_area = str_to_int(tmp_buf) + 0x40;
+
+	i = get_param_str( ctx, line, 5, tmp_buf );
+	if(i<0)
+		goto error;
+
+	area.max_len = str_to_int(tmp_buf);
+
+	i = get_param_strvar( ctx, line, 6, (char *)file_path );
+	if(i>=0)
+	{
+		pages_offset[0] = 0;
+
+		// count the pages and get the pages offsets...
+		if( open_file(&fc, file_path, 0xFF) >= 0 )
+		{
+			offset = 0;
+			page_idx = 0;
+			page_cnt = 1;
+			ret = 0;
+			while( !ret && ( offset<fc.file_size ) )
+			{
+				c = get_byte( &fc, offset, NULL );
+				ret = txt_area_add_char( ctx, &area, c, 1 );
+				switch(ret)
+				{
+					case 1: // Page full
+						page_idx++;
+						pages_offset[page_idx] = offset;
+						if(offset<fc.file_size)
+							page_cnt++;
+
+						area.col = 0;
+						area.row = 0;
+						ret = 0;
+					break;
+					default:
+						offset++;
+					break;
+				}
+
+			}
+
+			close_file(&fc);
+		}
+
+		if(open_file(&fc, file_path,0xFF)>=0)
+		{
+			page_idx = 0;
+			offset = 0;
+			txt_clear_area( ctx, &area );
+			txt_print_pagenb_area( ctx, &area, page_idx + 1, page_cnt );
+
+			do
+			{
+				// Print page
+				ret = 0;
+				while( !ret && ( offset<fc.file_size || ( !mdm_is_fifo_empty(&appctx->mdm->tx_fifo) && waitempty ) ) )
+				{
+					while( !ret && !mdm_is_fifo_full(&appctx->mdm->tx_fifo) && offset<fc.file_size)
+					{
+						c = get_byte( &fc, offset, NULL );
+						ret = txt_area_add_char( ctx, &area, c, 0 );
+
+						offset++;
+					}
+
+					if(!ret)
+						usleep(1000);
+				}
+
+				// ---------------------------------------------
+				// Keys
+				// ---------------------------------------------
+
+				c = wait_char(ctx);
+				code = c;
+				if(c == 0x13)
+				{
+					code <<= 8;
+					code |= wait_char(ctx);
+				}
+
+				switch(code)
+				{
+					case 0x1346: // Sommaire
+						// Retour sommaire
+						close_file(&fc);
+						return 0x1346;
+					break;
+
+					case 0x1353: // Connexion
+					case 0x1349: // Connexion/Fin
+					case 0x137F: // Timeout
+						close_file(&fc);
+						return code;
+					break;
+
+					case 0x1345: // Annulation
+					break;
+
+					case 0x1347: // Correction
+					break;
+
+					case 0x1342: // Retour
+						if( page_idx )
+							page_idx--;
+
+						offset = pages_offset[page_idx];
+						txt_clear_area( ctx, &area );
+						txt_print_pagenb_area( ctx, &area, page_idx + 1, page_cnt );
+
+						area.col = 0;
+						area.row = 0;
+					break;
+
+					case 0x1341: // Envoi
+					case 0x1348: // Suite
+						if( page_idx < page_cnt - 1 )
+							page_idx++;
+
+						offset = pages_offset[page_idx];
+						txt_clear_area( ctx, &area );
+						txt_print_pagenb_area( ctx, &area, page_idx + 1, page_cnt );
+
+						area.col = 0;
+						area.row = 0;
+					break;
+
+					default:
+					break;
+				}
+
+			}while(1);
+
+			close_file(&fc);
+
+			ret = SCRIPT_NO_ERROR;
+		}
+		else
+		{
+			ctx->script_printf( ctx, MSG_ERROR, "ERROR : Can't open %s !\n", file_path );
+
+			ret = SCRIPT_NOT_FOUND;
+		}
+	}
+
+#ifdef DEBUG
+	printf("xstart:%d ystart:%d xend:%d yend:%d\n", area.x_start_area - 0x40, area.y_start_area - 0x40, area.x_end_area - 0x40,area.y_end_area - 0x40);
+#endif
+
+	return SCRIPT_NO_ERROR;
+
+error:
+	ctx->script_printf( ctx, MSG_ERROR, "ERROR : field_edit - Bad parameter(s)\nfield_edit x_start_area y_start_area x_end_area y_end_area max_string_len\n");
+
+	return SCRIPT_CMD_BAD_PARAMETER;
+}
+
 static int cmd_wait_key( script_ctx * ctx, char * line)
 {
 	app_ctx * appctx;
@@ -2074,6 +2392,7 @@ cmd_list script_commands_list[] =
 	{"field_edit",              cmd_field_edit},
 	{"writetocsvfile",          cmd_writetocsv},
 	{"getcurdate",              cmd_getcurdate},
+	{"send_txt",                cmd_send_txt},
 
 	{ 0, 0 }
 };
