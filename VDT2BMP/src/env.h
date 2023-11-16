@@ -53,10 +53,17 @@
 #define STRTOVALUE strtoul
 #endif
 
+#define STATIC_ENV_BUFFER 1
+#define ENV_PAGE_SIZE (16*1024)
+
 typedef struct envvar_entry_
 {
-	char * name;
-	char * varvalue;
+#ifdef STATIC_ENV_BUFFER
+	unsigned char buf[ENV_PAGE_SIZE];
+#else
+	unsigned char * buf;
+#endif
+	int  bufsize;
 }envvar_entry;
 
 envvar_entry * setEnvVar( envvar_entry * env, char * varname, char * varvalue);
