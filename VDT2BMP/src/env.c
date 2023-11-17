@@ -156,6 +156,8 @@ static int pushStr(envvar_entry * env, int offset, char * str)
 		return -1;
 
 	size = strlen(str) + 1;
+	if(size > 0xFFFF)
+		return -1;
 
 	if( ( offset + 2 + size ) <  env->bufsize )
 	{
@@ -171,22 +173,83 @@ static int pushStr(envvar_entry * env, int offset, char * str)
 	return -1;
 }
 
-static int pushEnvEntry(envvar_entry * env, char * varname, char * varvalue)
+#ifndef STATIC_ENV_BUFFER
+static envvar_entry * realloc_env_buffer(envvar_entry * env, unsigned int size)
 {
-	int total_size;
+	unsigned int tmp_bufsize;
+	unsigned char * tmpbuf;
+
+	if( !env )
+	{
+		env = malloc( sizeof(envvar_entry) );
+		if(!env)
+			return NULL;
+
+		memset( env,0,sizeof(envvar_entry));
+	}
+
+	tmp_bufsize = size;
+
+	if( tmp_bufsize & (ENV_PAGE_SIZE - 1) )
+	{
+		tmp_bufsize = (tmp_bufsize & (~(ENV_PAGE_SIZE - 1))) + ENV_PAGE_SIZE;
+	}
+
+	if( tmp_bufsize > ENV_MAX_TOTAL_BUFFER_SIZE )
+	{
+		return env;
+	}
+
+	if( env->bufsize != tmp_bufsize )
+	{
+		tmpbuf = realloc(env->buf, tmp_bufsize);
+		if(tmpbuf)
+		{
+			if( env->bufsize < tmp_bufsize )
+				memset(&tmpbuf[env->bufsize], 0, tmp_bufsize - env->bufsize );
+
+			env->bufsize = tmp_bufsize;
+			env->buf = tmpbuf;
+		}
+	}
+
+	return env;
+}
+#endif
+
+static int pushEnvEntry(envvar_entry * env, char * varname, char * vardata)
+{
+	unsigned int total_size;
+	int varname_len,vardata_len;
 	int offset;
 
-	total_size = 2 + (strlen(varname) + 1) + 2 + (strlen(varvalue) + 1);
+	if(!varname || !vardata)
+		return -1;
+
+	varname_len = strlen(varname) + 1;
+	vardata_len = strlen(vardata) + 1;
+
+	if( varname_len > ENV_MAX_STRING_SIZE || vardata_len > ENV_MAX_STRING_SIZE)
+	{
+		return -2;
+	}
+
+	total_size = 2 + varname_len + 2 + vardata_len;
 
 	offset = getEnvEmptyOffset(env);
 	if( offset < 0 )
+	{
 		return -1;
+	}
+
+#ifndef STATIC_ENV_BUFFER
+	realloc_env_buffer(env, offset + total_size + 4);
+#endif
 
 	if( (total_size + offset) <  env->bufsize )
 	{
-
 		offset = pushStr(env, offset, varname);
-		offset = pushStr(env, offset, varvalue);
+		offset = pushStr(env, offset, vardata);
 
 		return offset;
 	}
@@ -194,13 +257,28 @@ static int pushEnvEntry(envvar_entry * env, char * varname, char * varvalue)
 	return -1;
 }
 
-envvar_entry * setEnvVar( envvar_entry * env, char * varname, char * varvalue )
+envvar_entry * setEnvVar( envvar_entry * env, char * varname, char * vardata )
 {
 	int i,off,ret;
 	unsigned short varname_size, vardata_size;
+	int varname_len, vardata_len;
 	int oldentrysize;
 
 	i = 0;
+
+	varname_len = 0;
+	vardata_len = 0;
+
+	if( varname )
+		varname_len = strlen(varname);
+
+	if( vardata )
+		vardata_len = strlen(vardata);
+
+	if( varname_len > ENV_MAX_STRING_SIZE || vardata_len > ENV_MAX_STRING_SIZE)
+	{
+		return env;
+	}
 
 	if(!env)
 	{
@@ -223,7 +301,6 @@ envvar_entry * setEnvVar( envvar_entry * env, char * varname, char * varvalue )
 			free(env);
 			return NULL;
 		}
-
 		memset(env->buf,0,env->bufsize);
 #endif
 	}
@@ -236,67 +313,63 @@ envvar_entry * setEnvVar( envvar_entry * env, char * varname, char * varvalue )
 
 		oldentrysize = 2 + varname_size + 2 + vardata_size;
 
-		if(varvalue)
+		if(vardata)
 		{
-			if( strlen(varvalue) + 1 > vardata_size )
+			vardata_len = strlen(vardata);
+			if( vardata_len + 1 > 0xFFFF )
+				return env;
+
+			if( vardata_len + 1 > vardata_size )
 			{
 				// add new entry, and pack the strings
-				ret = pushEnvEntry(env, varname, varvalue);
+				ret = pushEnvEntry(env, varname, vardata);
 				if( ret > 0 )
 				{
+					unsigned char byte;
 					for(i=0;i<env->bufsize - (off + oldentrysize);i++)
 					{
-						env->buf[off + i] = env->buf[off + i + oldentrysize];
-					}
-
-					for(int j=0;j<4;j++)
-					{
-						if(off + i < env->bufsize)
-						{
-							env->buf[off + i] = '\0';
-							i++;
-						}
+						byte = env->buf[off + i + oldentrysize];
+						env->buf[off + i + oldentrysize] = '\0';
+						env->buf[off + i] = byte;
 					}
 				}
 			}
 			else
 			{
 				vardata_size = getEnvStrSize(&env->buf[off + 2 + varname_size]); // var data string size
-
-				strcpy( (char*)&env->buf[off + 2 + varname_size + 2], varvalue );
+				if(vardata_size)
+				{
+					memset((char*)&env->buf[off + 2 + varname_size + 2], 0, vardata_size );
+					strncpy( (char*)&env->buf[off + 2 + varname_size + 2], vardata, vardata_size - 1);
+					env->buf[off + 2 + varname_size + 2 + vardata_size - 1] = '\0';
+				}
 			}
 		}
 		else
 		{
 			// unset variable
+			unsigned char byte;
 			for(i=0;i<env->bufsize - (off + oldentrysize);i++)
 			{
-				env->buf[off + i] = env->buf[off + i + oldentrysize];
-			}
-
-			for(int j=0;j<4;j++)
-			{
-				if(off + i < env->bufsize)
-				{
-					env->buf[off + i] = '\0';
-					i++;
-				}
+				byte = env->buf[off + i + oldentrysize];
+				env->buf[off + i + oldentrysize] = '\0';
+				env->buf[off + i] = byte;
 			}
 		}
 	}
 	else
 	{
-		if(varvalue)
+		if(vardata)
 		{
 			// New variable
-			ret = pushEnvEntry(env, varname, varvalue);
+			ret = pushEnvEntry(env, varname, vardata);
 		}
 	}
 
 	return env;
 }
 
-char * getEnvVar( envvar_entry * env, char * varname, char * varvalue)
+char * getEnvVar( envvar_entry * env, char * varname, char * vardata)
 {
 	int off;
 	unsigned short varname_size, vardata_size;
@@ -315,8 +388,11 @@ char * getEnvVar( envvar_entry * env, char * varname, char * varvalue)
 
 		if( varname_size>0 && vardata_size>0)
 		{
-			if(varvalue)
-				strncpy(varvalue,(char*)&env->buf[off + 2 + varname_size + 2], vardata_size);
+			if(vardata)
+			{
+				strncpy(vardata,(char*)&env->buf[off + 2 + varname_size + 2], ENV_MAX_STRING_SIZE);
+				vardata[ENV_MAX_STRING_SIZE - 1] = '\0';
+			}
 
 			return (char*)&env->buf[off + 2 + varname_size + 2];
 		}
@@ -370,7 +446,7 @@ envvar_entry * setEnvVarValue( envvar_entry * env, char * varname, env_var_value
 	return setEnvVar( env, varname, tmp_str );
 }
 
-char * getEnvVarIndex( envvar_entry * env, int index, char * varvalue)
+char * getEnvVarIndex( envvar_entry * env, int index, char * vardata)
 {
 	int str_index, off;
 	unsigned short varname_size, vardata_size;
@@ -388,8 +464,11 @@ char * getEnvVarIndex( envvar_entry * env, int index, char * varvalue)
 		{
 			if( varname_size>0 && vardata_size>0)
 			{
-				if(varvalue)
-					strncpy(varvalue,(char*)&env->buf[off + 2 + varname_size + 2], vardata_size);
+				if(vardata)
+				{
+					strncpy(vardata,(char*)&env->buf[off + 2 + varname_size + 2], ENV_MAX_STRING_SIZE);
+					vardata[ENV_MAX_STRING_SIZE - 1] = '\0';
+				}
 
 				return (char*)&env->buf[off + 2 + varname_size + 2];
 			}
