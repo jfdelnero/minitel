@@ -254,7 +254,7 @@ void audio_out(void *ctx, Uint8 *stream, int len)
 
 	if( timeout )
 	{
-		if ( 
+		if (
 			is_timeouted( mdm->last_tx_tick, mdm->wave_out_pages_cnt, ( (mdm->sample_rate*timeout) / mdm->wave_size ) ) &&
 			is_timeouted( mdm->serial_rx[1].last_rx_tick, mdm->wave_out_pages_cnt, ( (mdm->sample_rate*timeout) / mdm->wave_size ) )
 		)
@@ -362,7 +362,7 @@ void * ScriptServerThreadProc( void *lpParameter )
 
 		setOutputFunc_script( script, SCRIPT_CUI_affiche );
 
-		ctx->env = setEnvVar(ctx->env, "OUTFILE", (char*)&ctx->outfile_file );
+		setEnvVarDat(ctx->env, "OUTFILE", (char*)&ctx->outfile_file );
 
 		execute_file_script( script, (char*)&ctx->script_file );
 
