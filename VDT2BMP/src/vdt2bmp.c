@@ -1067,7 +1067,10 @@ int main(int argc, char* argv[])
 
 	memset(&appctx,0,sizeof(app_ctx));
 
-	appctx.env = setEnvVar(appctx.env, "VERSION", "v"STR_FILE_VERSION2);
+	appctx.env = initEnv( NULL, NULL );
+
+	setEnvVarDat(appctx.env, "VERSION", "v"STR_FILE_VERSION2);
+
 	appctx.io_cfg_flags = FLAGS_SDL_IO_SCREEN | FLAGS_SDL_IO_AUDIOIN | FLAGS_SDL_IO_AUDIOOUT;
 
 	vdt_ctx = NULL;

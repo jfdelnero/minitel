@@ -39,7 +39,7 @@
 #include <pthread.h>
 
 #include <time.h>
-
+#include <unistd.h>
 #ifdef WIN32
 #include <windows.h>
 #endif
@@ -268,7 +268,7 @@ static int get_param( script_ctx * ctx, char * line, int param_offset,char * par
 				return 1;
 			}
 
-			if( !getEnvVar( *((envvar_entry **)ctx->env), (char*)&var_str[1], param) )
+			if( !getEnvVarDat( (envvar_entry *)ctx->env, (char*)&var_str[1], param, DEFAULT_BUFLEN) )
 			{
 				copy_param(param, line, offs);
 			}
@@ -297,7 +297,7 @@ static int get_param_strvar( script_ctx * ctx, char * line, int param_offset,cha
 		{
 			copy_param(var_str, line, offs);
 
-			if( !getEnvVar( *((envvar_entry **)ctx->env), (char*)&var_str[1], param) )
+			if( !getEnvVarDat( (envvar_entry *)ctx->env, (char*)&var_str[1], param, DEFAULT_BUFLEN) )
 			{
 				//copy_param(param, line, offs);
 			}
@@ -380,7 +380,7 @@ static env_var_value get_script_variable( script_ctx * ctx, char * varname)
 	}
 
 	if(varname[0] == '$')
-		value = getEnvVarValue( *((envvar_entry **)ctx->env), (char*)&varname[1]);
+		value = getEnvVarValue( (envvar_entry *)ctx->env, (char*)&varname[1]);
 	else
 		value = str_to_int((char*)varname);
 
@@ -415,7 +415,7 @@ static void set_script_variable( script_ctx * ctx, char * varname, env_var_value
 	if(varname[0] == '$' && varname[1])
 	{
 		sprintf(tmp_str,"0x"LONGHEXSTR,value);
-		*((envvar_entry **)ctx->env) = (void *)setEnvVar( *((envvar_entry **)ctx->env), (char*)&varname[1], tmp_str );
+		setEnvVarDat( (envvar_entry *)ctx->env, (char*)&varname[1], tmp_str );
 
 		return;
 	}
@@ -1024,7 +1024,7 @@ static int cmd_print_env_var( script_ctx * ctx, char * line )
 
 	if(i>=0)
 	{
-		ptr = getEnvVar( *((envvar_entry **)ctx->env), (char*)&varname, (char*)&varvalue );
+		ptr = getEnvVarDat( (envvar_entry *)ctx->env, (char*)&varname, (char*)&varvalue, DEFAULT_BUFLEN );
 		if(ptr)
 		{
 			ctx->script_printf( ctx, MSG_INFO_1, "%s = %s", varname, varvalue );
@@ -1077,12 +1077,11 @@ static int cmd_print( script_ctx * ctx, char * line)
 				}
 				else
 				{
-					ptr = getEnvVar( *((envvar_entry **)ctx->env), &tmp_str[1], NULL);
+					ptr = getEnvVarDat( (envvar_entry *)ctx->env, &tmp_str[1], NULL, 0);
 					if( ptr )
 					{
 						strncat((char*)str,ptr,sizeof(str) - 1);
 						strncat((char*)str," ",sizeof(str) - 1);
-
 					}
 					else
 					{
@@ -1225,7 +1224,6 @@ static int cmd_set_env_var( script_ctx * ctx, char * line )
 	int i,j,ret;
 	char varname[DEFAULT_BUFLEN];
 	char varvalue[DEFAULT_BUFLEN];
-	envvar_entry * tmp_env;
 
 	ret = SCRIPT_CMD_BAD_PARAMETER;
 
@@ -1234,10 +1232,8 @@ static int cmd_set_env_var( script_ctx * ctx, char * line )
 
 	if(i>=0 && j>=0)
 	{
-		tmp_env = setEnvVar( *((envvar_entry **)ctx->env), (char*)&varname, (char*)&varvalue );
-		if(tmp_env)
+		if( setEnvVarDat( (envvar_entry *)ctx->env, (char*)&varname, (char*)&varvalue ) >= 0 )
 		{
-			*((envvar_entry **)ctx->env) = tmp_env;
 			ret = SCRIPT_NO_ERROR;
 		}
 		else
@@ -1370,7 +1366,7 @@ static int cmd_initarray( script_ctx * ctx, char * line)
 
 		if(size)
 		{
-			ptr = getEnvVar( *((envvar_entry **)ctx->env),(char*)&varname, NULL);
+			ptr = getEnvVarDat( (envvar_entry *)ctx->env,(char*)&varname, NULL, 0);
 			if(ptr)
 			{
 				arrayresize(ptr, size, (unsigned char)(str_to_int((char*)&varvalue)&0xFF));
@@ -1386,7 +1382,7 @@ static int cmd_initarray( script_ctx * ctx, char * line)
 			}
 
 			if(ptr)
-				*((envvar_entry **)ctx->env) = (void *)setEnvVar( *((envvar_entry **)ctx->env), (char*)&varname[1], ptr );
+				setEnvVarDat( (envvar_entry *)ctx->env, (char*)&varname[1], ptr );
 		}
 		ret = SCRIPT_NO_ERROR;
 	}
@@ -1559,7 +1555,7 @@ static int cmd_tx( script_ctx * ctx, char * line)
 
 			if(send_buf[2] == '$')
 			{
-				var = getEnvVar( *((envvar_entry **)ctx->env), &send_buf[3], NULL);
+				var = getEnvVarDat( (envvar_entry *)ctx->env, &send_buf[3], NULL, 0);
 				if( var )
 				{
 					i = 0;
@@ -1624,13 +1620,10 @@ static int cmd_getcurdate( script_ctx * ctx, char * line)
 	time_t t = time(NULL);
 	struct tm tm = *localtime(&t);
 	char str_date[DEFAULT_BUFLEN];
-	envvar_entry * tmp_env;
 
 	sprintf(str_date, "%d-%02d-%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
-	tmp_env = setEnvVar( *((envvar_entry **)ctx->env), "DATETIME", (char*)&str_date );
-	if(tmp_env)
-		*((envvar_entry **)ctx->env) = tmp_env;
+	setEnvVarDat( (envvar_entry *)ctx->env, "DATETIME", (char*)&str_date );
 
 	return SCRIPT_NO_ERROR;
 }
@@ -1810,7 +1803,6 @@ static void edit_area_add_char( script_ctx * ctx, edit_area * area, unsigned sho
 static int cmd_field_edit( script_ctx * ctx, char * line)
 {
 	char tmp_buf[DEFAULT_BUFLEN];
-	envvar_entry * tmp_env;
 	unsigned char field_buf[DEFAULT_BUFLEN];
 	int i=0;
 	unsigned char c;
@@ -1914,9 +1906,7 @@ static int cmd_field_edit( script_ctx * ctx, char * line)
 			case 0x1342: // Retour
 			case 0x1341: // Envoi
 			case 0x1348: // Suite
-				tmp_env = setEnvVar( *((envvar_entry **)ctx->env), "TXT_AREA", (char*)&field_buf );
-				if(tmp_env)
-					*((envvar_entry **)ctx->env) = tmp_env;
+				setEnvVarDat( (envvar_entry *)ctx->env, "TXT_AREA", (char*)&field_buf );
 
 				// Passage champ suivant
 				return code;
@@ -2327,7 +2317,7 @@ static int cmd_writetocsv( script_ctx * ctx, char * line)
 				}
 				else
 				{
-					ptr = getEnvVar( *((envvar_entry **)ctx->env), &tmp_str[1], NULL);
+					ptr = getEnvVarDat( (envvar_entry *)ctx->env, &tmp_str[1], NULL, 0 );
 					if( ptr )
 					{
 						strncat((char*)str,"\"",sizeof(str) - 1);
