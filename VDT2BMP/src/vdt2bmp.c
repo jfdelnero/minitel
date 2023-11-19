@@ -531,6 +531,8 @@ void printhelp(char* argv[])
 	fprintf(stderr,"  -audio_in/audio_out:[id]\t: Select audio input/output to use\n");
 	fprintf(stderr,"  -show:[file.vdt]\t\t: Display a vdt file\n");
 #endif
+	fprintf(stderr,"  -greyscale\t\t\t: greyscale display mode\n");
+	fprintf(stderr,"  -zoom:[1-8]\t\t\t: display zoom\n");
 	fprintf(stderr,"  -stdout \t\t\t: stdout mode\n");
 	fprintf(stderr,"  -help \t\t\t: This help\n");
 	fprintf(stderr,"  \nExamples :\n");
@@ -871,7 +873,9 @@ const char * audio_id_to_name(int id, int input)
 void update_surface(app_ctx * appctx, uint8_t * pixels)
 {
 	bitmap_data bmp;
-	int i;
+	int i,x,y;
+	int sur_x_res,sur_y_res;
+	uint32_t pixel;
 
 	if(appctx->vdt_ctx && appctx->mdm)
 	{
@@ -879,11 +883,21 @@ void update_surface(app_ctx * appctx, uint8_t * pixels)
 
 		if( pixels )
 		{
-			for(i=0;i<(bmp.xsize * bmp.ysize);i++)
+			sur_x_res = bmp.xsize * appctx->zoom;
+			sur_y_res = bmp.ysize * appctx->zoom;
+
+			i = 0;
+			for(y=0;y<sur_y_res;y++)
 			{
-				pixels[(i*4)+2] = bmp.data[i] & 0xFF;
-				pixels[(i*4)+1] = (bmp.data[i]>>8) & 0xFF;
-				pixels[(i*4)+0] = (bmp.data[i]>>16) & 0xFF;
+				for(x=0;x<sur_x_res;x++)
+				{
+					pixel = bmp.data[((y/appctx->zoom)*bmp.xsize) + (x/appctx->zoom)];
+
+					pixels[(i*4)+2] = pixel & 0xFF;
+					pixels[(i*4)+1] = (pixel>>8) & 0xFF;
+					pixels[(i*4)+0] = (pixel>>16) & 0xFF;
+					i++;
+				}
 			}
 		}
 	}
@@ -914,7 +928,7 @@ int SDL_app_loop( app_ctx * appctx, int audio_in_id, int audio_out_id)
 
 	if( appctx->io_cfg_flags & FLAGS_SDL_IO_SCREEN )
 	{
-		window = SDL_CreateWindow( "Minitel", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, appctx->vdt_ctx->bmp_res_x, appctx->vdt_ctx->bmp_res_y, SDL_WINDOW_SHOWN );
+		window = SDL_CreateWindow( "Minitel", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, appctx->vdt_ctx->bmp_res_x * appctx->zoom, appctx->vdt_ctx->bmp_res_y * appctx->zoom, SDL_WINDOW_SHOWN );
 		if(!window)
 		{
 			fprintf(stderr, "ERROR : SDL_CreateWindow - %s\n",SDL_GetError());
@@ -1113,6 +1127,22 @@ int main(int argc, char* argv[])
 		outmode = OUTPUT_MODE_STDOUT;
 	}
 
+	pal = 1;
+	if(isOption(argc,argv,"greyscale",NULL)>0)
+	{
+		pal = 0;
+	}
+
+	appctx.zoom = 1;
+	if(isOption(argc,argv,"zoom",(char*)&strtmp)>0)
+	{
+		appctx.zoom = atoi(strtmp);
+		if(appctx.zoom < 1 || appctx.zoom > 8)
+		{
+			appctx.zoom = 1;
+		}
+	}
+
 	if(isOption(argc,argv,"mic",NULL)>0)
 	{
 		mic_mode = 1;
@@ -1237,6 +1267,8 @@ int main(int argc, char* argv[])
 
 		vdt_load_charset(vdt_ctx, NULL);
 
+		vdt_select_palette(vdt_ctx, pal);
+
 		appctx.io_cfg_flags = FLAGS_SDL_IO_SCREEN;
 
 		if(open_file(&fc, filename,0xFF)>=0)
@@ -1276,12 +1308,6 @@ int main(int argc, char* argv[])
 
 	if(isOption(argc,argv,"bmp",(char*)&ofilename))
 	{
-		pal = 1;
-		if(isOption(argc,argv,"greyscale",NULL)>0)
-		{
-			pal = 0;
-		}
-
 		i = 1;
 		while( i < argc)
 		{
@@ -1306,12 +1332,9 @@ int main(int argc, char* argv[])
 		{
 			vdt_ctx->framerate = framerate;
 
-			if(isOption(argc,argv,"greyscale",NULL)>0)
-			{
-				vdt_select_palette(vdt_ctx,0);
-			}
-
 			vdt_load_charset(vdt_ctx, NULL);
+
+			vdt_select_palette(vdt_ctx,pal);
 
 			if( !mic_mode )
 			{

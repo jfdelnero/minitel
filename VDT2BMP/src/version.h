@@ -1,7 +1,7 @@
-#define FILE_VERSION        1,4,2,2
-#define STR_FILE_VERSION   "1,4,2,2\0"
-#define STR_FILE_VERSION2  "1.4.2.2"
-#define STR_DATE           "30 Oct 2023\0"
+#define FILE_VERSION        1,4,3,1
+#define STR_FILE_VERSION   "1,4,3,1\0"
+#define STR_FILE_VERSION2  "1.4.3.1"
+#define STR_DATE           "19 Nov 2023\0"
 #define NOMFENETRE    "VDT2BMP v" STR_FILE_VERSION2
 
 #define FILEVER        FILE_VERSION
