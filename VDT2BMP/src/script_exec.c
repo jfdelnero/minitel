@@ -431,7 +431,7 @@ script_ctx * init_script(void * app_ctx, unsigned int flags, void * env)
 	{
 		memset(ctx,0,sizeof(script_ctx));
 
-		ctx->env = ((envvar_entry**)env);
+		ctx->env = (envvar_entry*)env;
 
 		setOutputFunc_script( ctx, dummy_script_printf );
 
@@ -1158,7 +1158,7 @@ static int cmd_call( script_ctx * ctx, char * line )
 	{
 		ret = SCRIPT_INTERNAL_ERROR;
 
-		new_ctx = init_script((void*)appctx,0x00000000,(void*)&appctx->env);
+		new_ctx = init_script((void*)appctx,0x00000000,(void*)appctx->env);
 		if(new_ctx)
 		{
 			new_ctx->script_printf = ctx->script_printf;
