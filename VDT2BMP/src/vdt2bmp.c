@@ -521,7 +521,7 @@ int isOption(int argc, char* argv[],char * paramtosearch,char * argtoparam)
 void printhelp(char* argv[])
 {
 	fprintf(stderr,"Options:\n");
-	fprintf(stderr,"  -bmp[:out_file.bmp] \t\t: generate bmp file(s)\n");
+	fprintf(stderr,"  -bmp:[out_file.bmp] \t\t: generate bmp file(s)\n");
 	fprintf(stderr,"  -ani\t\t\t\t: generate animation\n");
 #ifdef SDL_SUPPORT
 	fprintf(stderr,"  -server:[script path]\t\t: Server mode\n");
@@ -529,6 +529,7 @@ void printhelp(char* argv[])
 	fprintf(stderr,"  -mic\t\t\t\t: Use the Microphone/Input line instead of files\n");
 	fprintf(stderr,"  -audio_list\t\t\t: List the available audio input(s)/output(s)\n");
 	fprintf(stderr,"  -audio_in/audio_out:[id]\t: Select audio input/output to use\n");
+	fprintf(stderr,"  -show:[file.vdt]\t\t: Display a vdt file\n");
 #endif
 	fprintf(stderr,"  -stdout \t\t\t: stdout mode\n");
 	fprintf(stderr,"  -help \t\t\t: This help\n");
@@ -942,24 +943,16 @@ int SDL_app_loop( app_ctx * appctx, int audio_in_id, int audio_out_id)
 		}
 	}
 
-	memset(&fmt_in,0,sizeof(fmt_in));
-	fmt_in.freq = appctx->mdm->sample_rate;
-	fmt_in.format = AUDIO_S16;
-	fmt_in.channels = 1;
-	fmt_in.samples = appctx->mdm->wave_size;
-	fmt_in.callback = audio_in;
-	fmt_in.userdata = appctx;
-
-	memset(&fmt_out,0,sizeof(fmt_out));
-	fmt_out.freq = appctx->mdm->sample_rate;
-	fmt_out.format = AUDIO_S16;
-	fmt_out.channels = 1;
-	fmt_out.samples = appctx->mdm->wave_size;
-	fmt_out.callback = audio_out;
-	fmt_out.userdata = appctx;
-
 	if( appctx->io_cfg_flags & FLAGS_SDL_IO_AUDIOIN )
 	{
+		memset(&fmt_in,0,sizeof(fmt_in));
+		fmt_in.freq = appctx->mdm->sample_rate;
+		fmt_in.format = AUDIO_S16;
+		fmt_in.channels = 1;
+		fmt_in.samples = appctx->mdm->wave_size;
+		fmt_in.callback = audio_in;
+		fmt_in.userdata = appctx;
+
 		audio_in_sdl_id = SDL_OpenAudioDevice(audio_id_to_name(audio_in_id, 1), 1, &fmt_in, &fmt_in, 0);
 		if ( audio_in_sdl_id <= 0 )
 		{
@@ -970,6 +963,14 @@ int SDL_app_loop( app_ctx * appctx, int audio_in_id, int audio_out_id)
 
 	if( appctx->io_cfg_flags & FLAGS_SDL_IO_AUDIOOUT )
 	{
+		memset(&fmt_out,0,sizeof(fmt_out));
+		fmt_out.freq = appctx->mdm->sample_rate;
+		fmt_out.format = AUDIO_S16;
+		fmt_out.channels = 1;
+		fmt_out.samples = appctx->mdm->wave_size;
+		fmt_out.callback = audio_out;
+		fmt_out.userdata = appctx;
+
 		audio_out_sdl_id = SDL_OpenAudioDevice(audio_id_to_name(audio_out_id, 0), 0, &fmt_out, &fmt_out, 0);
 		if ( audio_out_sdl_id <= 0 )
 		{
@@ -1061,6 +1062,7 @@ int main(int argc, char* argv[])
 	float framerate;
 	videotex_ctx * vdt_ctx;
 	app_ctx appctx;
+	file_cache fc;
 #ifdef SDL_SUPPORT
 	int audio_in_id,audio_out_id;
 #endif
@@ -1215,6 +1217,52 @@ int main(int argc, char* argv[])
 #endif
 	}
 
+	if(isOption(argc,argv,"show",(char*)&filename)>0)
+	{
+#ifdef SDL_SUPPORT
+		bitmap_data bmp;
+		unsigned char c;
+		int offset;
+
+		memset(&fc,0,sizeof(file_cache));
+
+		vdt_ctx = vdt_init();
+
+		mdm_init(&mdm_ctx);
+		appctx.mdm = &mdm_ctx;
+
+		appctx.vdt_ctx = vdt_ctx;
+
+		vdt_ctx->framerate = framerate;
+
+		vdt_load_charset(vdt_ctx, NULL);
+
+		appctx.io_cfg_flags = FLAGS_SDL_IO_SCREEN;
+
+		if(open_file(&fc, filename,0xFF)>=0)
+		{
+			offset = 0;
+			while( (offset<fc.file_size ) )
+			{
+				while(!mdm_is_fifo_full(&mdm_ctx.rx_fifo[0]) && offset<fc.file_size)
+				{
+					c = get_byte( &fc, offset, NULL );
+					mdm_push_to_fifo( &mdm_ctx.rx_fifo[0], c);
+					offset++;
+				}
+
+				update_frame(appctx.vdt_ctx, &mdm_ctx, &bmp);
+			}
+
+			close_file(&fc);
+		}
+
+		SDL_app_loop( &appctx, audio_in_id, audio_out_id );
+#else
+		fprintf(stderr, "ERROR : No built-in SDL support !\n");
+#endif
+	}
+
 	// help option...
 	if(isOption(argc,argv,"help",0)>0)
 	{
@@ -1358,6 +1406,7 @@ int main(int argc, char* argv[])
 		(isOption(argc,argv,"vdt",0)<=0)  &&
 		(isOption(argc,argv,"ani",0)<=0)  &&
 		(isOption(argc,argv,"mic",0)<=0)  &&
+		(isOption(argc,argv,"show",0)<=0)  &&
 		(isOption(argc,argv,"audio_list",0)<=0)  &&
 		(isOption(argc,argv,"server",0)<=0)  &&
 		(isOption(argc,argv,"bmp",0)<=0) )
