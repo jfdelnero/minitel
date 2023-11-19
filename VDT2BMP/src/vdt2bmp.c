@@ -355,7 +355,7 @@ void * ScriptServerThreadProc( void *lpParameter )
 
 	ctx = (app_ctx *)lpParameter;
 
-	script = init_script((void *)ctx, 0x00000000, (void*)&ctx->env);
+	script = init_script((void *)ctx, 0x00000000, (void*)ctx->env);
 	if( script )
 	{
 		ctx->srvscript = (void*)script;
@@ -1210,6 +1210,8 @@ int main(int argc, char* argv[])
 		vdt_ctx->framerate = framerate;
 
 		vdt_load_charset(vdt_ctx, NULL);
+
+		vdt_select_palette(vdt_ctx, pal);
 
 		mdm_init(&mdm_ctx);
 		appctx.mdm = &mdm_ctx;
