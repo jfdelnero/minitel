@@ -53,6 +53,7 @@ typedef struct videotex_ctx_
 
 	int cursor_x_pos;
 	int cursor_y_pos;
+	int cursor_enabled;
 
 	uint32_t decoder_state;
 	uint32_t decoder_step;
@@ -61,6 +62,9 @@ typedef struct videotex_ctx_
 	unsigned char last_char;
 
 	unsigned int  current_attributs;
+	unsigned int  waiting_attributs;
+	unsigned int  waiting_attributs_mask;
+
 	unsigned int  underline_latch;
 
 	unsigned int palette[8];
@@ -84,15 +88,18 @@ typedef struct videotex_ctx_
 #define ATTRIBUTS_BACKGROUND_C0LOR_MASK   0x7
 #define ATTRIBUTS_BACKGROUND_C0LOR_SHIFT  0x4
 
-#define ATTRIBUTS_FONT_MASK        0x3
-#define ATTRIBUTS_FONT_SHIFT       0x8
+#define ATTRIBUTS_FONT_MASK               0x3
+#define ATTRIBUTS_FONT_SHIFT              0x8
 
-#define ATTRIBUTS_INVERT_SHIFT     0xA
-#define ATTRIBUTS_BLINK_SHIFT      0xB
-#define ATTRIBUTS_UNDERLINE_SHIFT  0xC
-#define ATTRIBUTS_MASK_SHIFT       0xD
-#define ATTRIBUTS_XZOOM_SHIFT      0xE
-#define ATTRIBUTS_YZOOM_SHIFT      0xF
+#define ATTRIBUTS_INVERT_SHIFT            0xA
+#define ATTRIBUTS_BLINK_SHIFT             0xB
+#define ATTRIBUTS_UNDERLINE_SHIFT         0xC
+#define ATTRIBUTS_MASK_SHIFT              0xD
+#define ATTRIBUTS_XZOOM_SHIFT             0xE
+#define ATTRIBUTS_YZOOM_SHIFT             0xF
+#define ATTRIBUTS_SEPARATE_SHIFT          0x10
+#define ATTRIBUTS_DELIM_SHIFT             0x11
+#define ATTRIBUTS_UNDERLINEZONE_SHIFT     0x12
 
 videotex_ctx * vdt_init();
 
