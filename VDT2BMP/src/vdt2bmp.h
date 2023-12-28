@@ -50,6 +50,7 @@ typedef struct app_ctx_
 {
 	videotex_ctx * vdt_ctx;
 	modem_ctx *mdm;
+	dtmf_ctx *dtmfctx;
 	void * srvscript;
 	char script_file[512];
 	char outfile_file[512];

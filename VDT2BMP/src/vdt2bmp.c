@@ -71,7 +71,9 @@ Available command line options :
 #include "cache.h"
 #include "videotex.h"
 #include "bmp_file.h"
+#include "fifo.h"
 #include "modem.h"
+#include "dtmf.h"
 
 #include "FIR/band_pass_rx_Filter.h"
 #include "FIR/low_pass_tx_Filter.h"
@@ -261,8 +263,8 @@ void audio_out(void *ctx, Uint8 *stream, int len)
 		{
 			// No rx/tx event sync X seconds ?
 			// Send a fake timeout code to the script engine...
-			mdm_push_to_fifo(&mdm->rx_fifo[1], 0x13);
-			mdm_push_to_fifo(&mdm->rx_fifo[1], 0x7F);
+			push_to_fifo(&mdm->rx_fifo[1], 0x13);
+			push_to_fifo(&mdm->rx_fifo[1], 0x7F);
 			mdm->serial_rx[1].last_rx_tick = mdm->wave_out_pages_cnt;
 		}
 	}
@@ -551,7 +553,7 @@ int update_frame(videotex_ctx * vdt_ctx,modem_ctx *mdm, bitmap_data * bmp)
 {
 	unsigned char byte;
 
-	while(mdm_pop_from_fifo(&mdm->rx_fifo[0], &byte))
+	while(pop_from_fifo(&mdm->rx_fifo[0], &byte))
 	{
 		vdt_push_char( vdt_ctx, byte );
 	}
@@ -629,7 +631,7 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framera
 			switch(out_mode)
 			{
 				case OUTPUT_MODE_STDOUT:
-					while(!mdm_is_fifo_empty(&mdm->tx_fifo))
+					while(!is_fifo_empty(&mdm->tx_fifo))
 					{
 						gen_stdout_frame(vdt_ctx, mdm, tmp_buf);
 					}
@@ -642,7 +644,7 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framera
 
 				case OUTPUT_MODE_SDL:
 					// Wait tx fifo empty
-					while(!mdm_is_fifo_empty(&mdm->tx_fifo))
+					while(!is_fifo_empty(&mdm->tx_fifo))
 					{
 					}
 
@@ -662,12 +664,12 @@ int animate(videotex_ctx * vdt_ctx, modem_ctx *mdm, char * vdtfile,float framera
 		vdt_ctx->pages_cnt++;
 
 		offset = 0;
-		while( (offset<fc.file_size || !mdm_is_fifo_empty(&mdm->tx_fifo) || (pause_frames_cnt < vdt_ctx->framerate * 1)) && !(*quit) )
+		while( (offset<fc.file_size || !is_fifo_empty(&mdm->tx_fifo) || (pause_frames_cnt < vdt_ctx->framerate * 1)) && !(*quit) )
 		{
-			while(!mdm_is_fifo_full(&mdm->tx_fifo) && offset<fc.file_size)
+			while(!is_fifo_full(&mdm->tx_fifo) && offset<fc.file_size)
 			{
 				c = get_byte( &fc, offset, NULL );
-				mdm_push_to_fifo( &mdm->tx_fifo, c);
+				push_to_fifo( &mdm->tx_fifo, c);
 				offset++;
 			}
 
@@ -1071,6 +1073,8 @@ int main(int argc, char* argv[])
 	char ofilename[512];
 	char strtmp[1024];
 	modem_ctx mdm_ctx;
+	dtmf_ctx dtmfctx;
+
 	int pal, outmode;
 	int i,mic_mode;
 	float framerate;
@@ -1216,6 +1220,9 @@ int main(int argc, char* argv[])
 		mdm_init(&mdm_ctx);
 		appctx.mdm = &mdm_ctx;
 
+		dtmf_init(&dtmfctx,mdm_ctx.sample_rate);
+		appctx.dtmfctx = &dtmfctx;
+
 		appctx.timeout_seconds = 4*60;
 
 		if(isOption(argc,argv,"timeout",(char*)&strtmp))
@@ -1278,10 +1285,10 @@ int main(int argc, char* argv[])
 			offset = 0;
 			while( (offset<fc.file_size ) )
 			{
-				while(!mdm_is_fifo_full(&mdm_ctx.rx_fifo[0]) && offset<fc.file_size)
+				while(!is_fifo_full(&mdm_ctx.rx_fifo[0]) && offset<fc.file_size)
 				{
 					c = get_byte( &fc, offset, NULL );
-					mdm_push_to_fifo( &mdm_ctx.rx_fifo[0], c);
+					push_to_fifo( &mdm_ctx.rx_fifo[0], c);
 					offset++;
 				}
 
@@ -1322,6 +1329,11 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	if(isOption(argc,argv,"sdlout",NULL)>0)
+	{
+		outmode = OUTPUT_MODE_SDL;
+	}
+
 	// Animation generator
 	if(isOption(argc,argv,"ani",NULL)>0)
 	{
@@ -1340,7 +1352,6 @@ int main(int argc, char* argv[])
 
 			if( !mic_mode )
 			{
-
 				#ifndef EMSCRIPTEN_SUPPORT
 				remove(DEFAULT_SOUND_FILE);
 				#endif
@@ -1369,7 +1380,7 @@ int main(int argc, char* argv[])
 					i = 0;
 					while( i < sizeof(vdt_test_001) )
 					{
-						if( !mdm_push_to_fifo( &mdm_ctx.tx_fifo, vdt_test_001[i] ) )
+						if( !push_to_fifo( &mdm_ctx.tx_fifo, vdt_test_001[i] ) )
 						{
 							emscripten_sleep(10);
 						}

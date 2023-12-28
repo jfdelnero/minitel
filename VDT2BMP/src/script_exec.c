@@ -49,7 +49,9 @@
 #include "cache.h"
 #include "videotex.h"
 #include "bmp_file.h"
+#include "fifo.h"
 #include "modem.h"
+#include "dtmf.h"
 
 #include "FIR/band_pass_rx_Filter.h"
 #include "FIR/low_pass_tx_Filter.h"
@@ -1426,12 +1428,12 @@ static int cmd_send_file( script_ctx * ctx, char * line)
 		if(open_file(&fc, filename,0xFF)>=0)
 		{
 			offset = 0;
-			while( ( offset<fc.file_size || ( !mdm_is_fifo_empty(&appctx->mdm->tx_fifo) && waitempty ) ) )
+			while( ( offset<fc.file_size || ( !is_fifo_empty(&appctx->mdm->tx_fifo) && waitempty ) ) )
 			{
-				while(!mdm_is_fifo_full(&appctx->mdm->tx_fifo) && offset<fc.file_size)
+				while(!is_fifo_full(&appctx->mdm->tx_fifo) && offset<fc.file_size)
 				{
 					c = get_byte( &fc, offset, NULL );
-					mdm_push_to_fifo( &appctx->mdm->tx_fifo, c);
+					push_to_fifo( &appctx->mdm->tx_fifo, c);
 					offset++;
 				}
 
@@ -1462,7 +1464,7 @@ static int cmd_purge_rx_buffer( script_ctx * ctx, char * line)
 
 	ret = SCRIPT_CMD_BAD_PARAMETER;
 
-	mdm_purge_fifo(&appctx->mdm->rx_fifo[1]);
+	purge_fifo(&appctx->mdm->rx_fifo[1]);
 
 	return ret;
 }
@@ -1476,7 +1478,7 @@ static int cmd_purge_tx_buffer( script_ctx * ctx, char * line)
 
 	ret = SCRIPT_CMD_BAD_PARAMETER;
 
-	mdm_purge_fifo(&appctx->mdm->tx_fifo);
+	purge_fifo(&appctx->mdm->tx_fifo);
 
 	return ret;
 }
@@ -1486,7 +1488,7 @@ static int cmd_is_tx_buffer_empty( script_ctx * ctx, char * line)
 	app_ctx * appctx;
 	appctx = (app_ctx *)ctx->app_ctx;
 
-	if( mdm_is_fifo_empty(&appctx->mdm->tx_fifo) )
+	if( is_fifo_empty(&appctx->mdm->tx_fifo) )
 		return SCRIPT_TRUE;
 	else
 		return SCRIPT_FALSE;
@@ -1497,7 +1499,7 @@ static int cmd_is_rx_buffer_empty( script_ctx * ctx, char * line)
 	app_ctx * appctx;
 	appctx = (app_ctx *)ctx->app_ctx;
 
-	if( mdm_is_fifo_empty(&appctx->mdm->rx_fifo[1]) )
+	if( is_fifo_empty(&appctx->mdm->rx_fifo[1]) )
 		return SCRIPT_TRUE;
 	else
 		return SCRIPT_FALSE;
@@ -1509,12 +1511,12 @@ static int cmd_rx_char( script_ctx * ctx, char * line)
 	appctx = (app_ctx *)ctx->app_ctx;
 	unsigned char c;
 
-	while ( mdm_is_fifo_empty(&appctx->mdm->rx_fifo[1]) )
+	while ( is_fifo_empty(&appctx->mdm->rx_fifo[1]) )
 	{
 		usleep(4000);
 	}
 
-	mdm_pop_from_fifo(&appctx->mdm->rx_fifo[1], &c);
+	pop_from_fifo(&appctx->mdm->rx_fifo[1], &c);
 
 	ctx->last_data_value = c;
 
@@ -1604,11 +1606,11 @@ static int cmd_tx( script_ctx * ctx, char * line)
 
 		for(i=0;i<size;i++)
 		{
-			while ( mdm_is_fifo_full(&appctx->mdm->tx_fifo) )
+			while ( is_fifo_full(&appctx->mdm->tx_fifo) )
 			{
 				usleep(1000);
 			}
-			mdm_push_to_fifo(&appctx->mdm->tx_fifo, (unsigned char)ptr[i]);
+			push_to_fifo(&appctx->mdm->tx_fifo, (unsigned char)ptr[i]);
 		}
 	}
 
@@ -1634,12 +1636,12 @@ unsigned char wait_char(script_ctx * ctx)
 	appctx = (app_ctx *)ctx->app_ctx;
 	unsigned char c;
 
-	while ( mdm_is_fifo_empty(&appctx->mdm->rx_fifo[1]) )
+	while ( is_fifo_empty(&appctx->mdm->rx_fifo[1]) )
 	{
 		usleep(4000);
 	}
 
-	mdm_pop_from_fifo(&appctx->mdm->rx_fifo[1], &c);
+	pop_from_fifo(&appctx->mdm->rx_fifo[1], &c);
 
 	return c;
 }
@@ -1649,12 +1651,12 @@ void send_char(script_ctx * ctx, unsigned char c)
 	app_ctx * appctx;
 	appctx = (app_ctx *)ctx->app_ctx;
 
-	while ( mdm_is_fifo_full(&appctx->mdm->tx_fifo) )
+	while ( is_fifo_full(&appctx->mdm->tx_fifo) )
 	{
 		usleep(1000);
 	}
 
-	mdm_push_to_fifo(&appctx->mdm->tx_fifo, (unsigned char)c);
+	push_to_fifo(&appctx->mdm->tx_fifo, (unsigned char)c);
 
 #ifdef DEBUG
 	printf ("s>%X\n",c);
@@ -2142,9 +2144,9 @@ static int cmd_send_txt( script_ctx * ctx, char * line)
 			{
 				// Print page
 				ret = 0;
-				while( !ret && ( offset<fc.file_size || ( !mdm_is_fifo_empty(&appctx->mdm->tx_fifo) && waitempty ) ) )
+				while( !ret && ( offset<fc.file_size || ( !is_fifo_empty(&appctx->mdm->tx_fifo) && waitempty ) ) )
 				{
-					while( !ret && !mdm_is_fifo_full(&appctx->mdm->tx_fifo) && offset<fc.file_size)
+					while( !ret && !is_fifo_full(&appctx->mdm->tx_fifo) && offset<fc.file_size)
 					{
 						c = get_byte( &fc, offset, NULL );
 						ret = txt_area_add_char( ctx, &area, c, 0 );
@@ -2256,12 +2258,12 @@ static int cmd_wait_key( script_ctx * ctx, char * line)
 	{
 		code <<= 8;
 
-		while ( mdm_is_fifo_empty(&appctx->mdm->rx_fifo[1]) )
+		while ( is_fifo_empty(&appctx->mdm->rx_fifo[1]) )
 		{
 			usleep(4000);
 		}
 
-		mdm_pop_from_fifo(&appctx->mdm->rx_fifo[1], &c);
+		pop_from_fifo(&appctx->mdm->rx_fifo[1], &c);
 
 		code |= c;
 
