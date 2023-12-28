@@ -1008,6 +1008,8 @@ static void vdt_clear_page(videotex_ctx * ctx)
 		vdt_print_char(ctx,0x00);
 	}
 
+	memset(ctx->bmp_buffer, 0, ctx->bmp_res_x * ctx->bmp_res_y * sizeof(uint32_t));
+
 	vdt_set_cursor(ctx,3,38,0);
 
 	attributs = ctx->current_attributs;
