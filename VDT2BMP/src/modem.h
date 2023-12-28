@@ -34,17 +34,7 @@
 #define PI 3.1415926535897932384626433832795
 #endif
 
-#define SERIAL_FIFO_SIZE 4096
-
 #define DEFAULT_SOUND_BUFFER_SIZE 2048
-
-typedef struct serial_fifo_
-{
-	int in_ptr;
-	int out_ptr;
-
-	unsigned char fifo[SERIAL_FIFO_SIZE];
-}serial_fifo;
 
 typedef struct mean_ctx_
 {
@@ -137,6 +127,7 @@ typedef struct modem_ctx_
 	serial_fifo tx_fifo;
 
 	unsigned int wave_out_pages_cnt;
+
 }modem_ctx;
 
 void mdm_init(modem_ctx *mdm);
@@ -147,12 +138,8 @@ int  mdm_prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte);
 int  mdm_genWave(modem_ctx *mdm, short * buf, int size);
 void mdm_demodulate(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt, short * wavebuf,int samplescnt);
 
-int  mdm_is_fifo_empty(serial_fifo *fifo);
-int  mdm_is_fifo_full(serial_fifo *fifo);
-int  mdm_push_to_fifo(serial_fifo *fifo, unsigned char c);
-int  mdm_pop_from_fifo(serial_fifo *fifo, unsigned char * c);
-int  mdm_purge_fifo(serial_fifo *fifo);
-
 int  mdm_is_carrier_present(modem_ctx *mdm, modem_demodulator_ctx *mdm_dmt);
 
 int  write_wave_file(char* filename,short * wavebuf,int size,int samplerate);
+
+float freq2step(unsigned int sample_rate, int freq );

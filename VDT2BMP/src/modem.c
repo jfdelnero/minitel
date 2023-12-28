@@ -42,7 +42,9 @@
 
 #include "cache.h"
 #include "wave.h"
+#include "fifo.h"
 #include "modem.h"
+#include "dtmf.h"
 
 int write_wave_file(char* filename,short * wavebuf,int size,int samplerate)
 {
@@ -204,66 +206,6 @@ int mdm_prepare_next_word(modem_ctx * mdm, int * tx_buffer,unsigned char byte)
 	return tx_buffer_size;
 }
 
-int mdm_is_fifo_empty(serial_fifo *fifo)
-{
-	if( ( fifo->in_ptr & (SERIAL_FIFO_SIZE-1) ) == ( fifo->out_ptr & (SERIAL_FIFO_SIZE-1) ) )
-	{
-		return 1;
-	}
-	else
-	{
-		return 0;
-	}
-}
-
-int mdm_is_fifo_full(serial_fifo *fifo)
-{
-	if( ( (fifo->in_ptr + 1) & (SERIAL_FIFO_SIZE-1) ) == ( fifo->out_ptr & (SERIAL_FIFO_SIZE-1) ) )
-	{
-		return 1;
-	}
-	else
-	{
-		return 0;
-	}
-}
-
-int mdm_push_to_fifo(serial_fifo *fifo, unsigned char c)
-{
-	if ( mdm_is_fifo_full(fifo) )
-		return 0;
-
-	fifo->fifo[(fifo->in_ptr & (SERIAL_FIFO_SIZE-1))] = c;
-
-	fifo->in_ptr = (fifo->in_ptr + 1) & (SERIAL_FIFO_SIZE-1);
-
-	return 1;
-}
-
-int mdm_pop_from_fifo(serial_fifo *fifo, unsigned char * c)
-{
-	int ret;
-
-	ret = 0;
-
-	if( !mdm_is_fifo_empty(fifo) )
-	{
-		*c = fifo->fifo[fifo->out_ptr & (SERIAL_FIFO_SIZE-1)];
-		fifo->out_ptr = (fifo->out_ptr + 1) & (SERIAL_FIFO_SIZE-1);
-		ret = 1;
-	}
-
-	return ret;
-}
-
-int mdm_purge_fifo(serial_fifo *fifo)
-{
-	fifo->in_ptr = 0;
-	fifo->out_ptr = 0;
-
-	return 0;
-}
-
 int mdm_serial_rx(modem_ctx *mdm, serial_rx_ctx * rx_ctx, int state)
 {
 	unsigned char mask;
@@ -353,7 +295,7 @@ int mdm_serial_rx(modem_ctx *mdm, serial_rx_ctx * rx_ctx, int state)
 				printf("Rx byte : 0x%.2X %c\n",rx_ctx->serial_rx_shiftreg, rx_ctx->serial_rx_shiftreg&0x7F);
 			}
 
-			if( !mdm_push_to_fifo(&mdm->rx_fifo[rx_ctx->fifo_idx], rx_ctx->serial_rx_shiftreg) )
+			if( !push_to_fifo(&mdm->rx_fifo[rx_ctx->fifo_idx], rx_ctx->serial_rx_shiftreg) )
 			{
 				printf("RX Fifo full !\n");
 			}
@@ -397,7 +339,7 @@ int mdm_genWave(modem_ctx *mdm, short * buf, int size)
 			}
 			else
 			{
-				if( mdm_pop_from_fifo(&mdm->tx_fifo, &c) )
+				if( pop_from_fifo(&mdm->tx_fifo, &c) )
 				{
 					mdm->tx_buffer_size = mdm_prepare_next_word( mdm, (int*)mdm->tx_buffer, c );
 					mdm->tx_buffer_offset = 0;
