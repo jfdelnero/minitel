@@ -35,11 +35,22 @@
 #define DEFAULT_SPACE_DURATION_MS 250
 #define DEFAULT_MAX_LEVEL 14000
 
+typedef struct goertzet_stat_
+{
+	int freq;
+	int smp_cnt;
+	int wnd_smp_cnt;
+	double W;
+	double Q0, Q1, Q2;
+	double coef;
+	double power;
+}goertzet_stat;
+
 typedef struct dtmf_ctx_
 {
 	int sample_rate;
 	float freqsstep[8];
-
+	goertzet_stat goertzet_detect[8];
 	float phase[2];
 	float mod_step[2];
 
@@ -58,3 +69,5 @@ typedef struct dtmf_ctx_
 void dtmf_init(dtmf_ctx *dtmf, int sample_rate);
 int  dtmf_genWave(dtmf_ctx *dtmf, short * buf, int size);
 int  dtmf_gen_code(dtmf_ctx *dtmf, unsigned char c);
+int  dtmf_decodWave( dtmf_ctx *dtmf, short * buf, int size);
+

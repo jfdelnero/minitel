@@ -176,6 +176,88 @@ int  dtmf_genWave( dtmf_ctx *dtmf, short * buf, int size)
 	return 0;
 }
 
+// goertzelPower function
+//         _____
+//Buf[i]  |     |
+//  ----->|  +  |----------------------X--------------------------->
+//        |_____|                    __|__ Q0
+//          ^  ^    _____           | REG |
+//          |   \__|*coef|          |_____|
+//          |      |_____|<---\        |
+//          |                  \-------|Q1
+//        __|__                      __|__
+//       |* -1 |____________________| REG |
+//       |_____|                Q2  |_____|
+//
+//
+// m = (ftone /  (sample_rate / buffer_size ) )
+// coef = 2 * COS ( 2 * PI * m / buffer_sizes)
+// coef = 2 * COS ( 2 * PI * (ftone /  (sample_rate / buffer_size ) ) / buffer_sizes)
+// coef = 2 * COS ( 2 * PI * (ftone *  (buffer_size / sample_rate ) ) / buffer_sizes)
+// coef = 2 * COS ( 2 * PI * ( (ftone / buffer_sizes) * (buffer_size / sample_rate ) ) )
+// coef = 2 * COS ( 2 * PI * (ftone / sample_rate ) )
+// Q0 = Buf[i] + (Q1 * coef) + (Q2 * -1)
+//
+
+void init_goertzel(goertzet_stat * ctx, int ftone, int sample_rate, int window_ms)
+{
+	ctx->freq = ftone;
+	ctx->W = (2.0 * M_PI * ((double)ftone) / (double)sample_rate);
+
+	ctx->wnd_smp_cnt = (int)(((double)sample_rate * window_ms) / (double)1000);
+
+	ctx->coef = 2 * cos(ctx->W);
+
+	ctx->Q0 = 0;
+	ctx->Q1 = 0;
+	ctx->Q2 = 0;
+	ctx->smp_cnt = 0;
+}
+
+static void poke_goertzel(goertzet_stat * ctx, short sample)
+{
+	ctx->Q0 = (double)sample + (ctx->coef * ctx->Q1) - ctx->Q2;
+	ctx->Q2 = ctx->Q1;
+	ctx->Q1 = ctx->Q0;
+	ctx->smp_cnt++;
+}
+
+double get_goertzelPower(goertzet_stat * ctx)
+{
+	ctx->power = sqrt((ctx->Q1*ctx->Q1) + (ctx->Q2*ctx->Q2) - (ctx->coef * ctx->Q1 * ctx->Q2));
+	return ctx->power;
+}
+
+int  dtmf_decodWave( dtmf_ctx *dtmf, short * buf, int size)
+{
+	int i, j;
+
+	i = 0;
+	for(i=0;i<size;i++)
+	{
+		for(j=0;j<8;j++)
+		{
+			poke_goertzel(&dtmf->goertzet_detect[j], buf[i]);
+		}
+
+		if( dtmf->goertzet_detect[0].smp_cnt >= dtmf->goertzet_detect[0].wnd_smp_cnt)
+		{
+			for(j=0;j<8;j++)
+			{
+				dtmf->goertzet_detect[j].power = get_goertzelPower( &dtmf->goertzet_detect[j] );
+				printf("[%d]=%f  ",j, dtmf->goertzet_detect[j].power);
+				dtmf->goertzet_detect[j].Q0 = 0;
+				dtmf->goertzet_detect[j].Q1 = 0;
+				dtmf->goertzet_detect[j].Q2 = 0;
+				dtmf->goertzet_detect[j].smp_cnt = 0;
+			}
+			printf("\n");
+		}
+	}
+
+	return 0;
+}
+
 void dtmf_init(dtmf_ctx *dtmf, int sample_rate)
 {
 	int i;
@@ -185,9 +267,11 @@ void dtmf_init(dtmf_ctx *dtmf, int sample_rate)
 		memset(dtmf,0,sizeof(dtmf_ctx));
 
 		dtmf->sample_rate = sample_rate;
+
 		for(i=0;i<8;i++)
 		{
 			dtmf->freqsstep[i] = freq2step(sample_rate, freqslist[i] );
+			init_goertzel(&dtmf->goertzet_detect[i] , freqslist[i], dtmf->sample_rate, 10);
 		}
 
 		dtmf->mark_time_cfg = (dtmf->sample_rate * DEFAULT_MARK_DURATION_MS) / 1000;
