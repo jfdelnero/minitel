@@ -7,6 +7,7 @@ Ce dépot contient différents projets en lien avec le Minitel.
 [**doc/**](doc/)
 
 Minitel hardware and firmware hack study.
+( Please visit http://hxc2001.free.fr/minitel/index.html too !)
 
 [**minitel2/**](minitel2/)
 
@@ -21,6 +22,9 @@ Vidéotex files (*.VDT) to audio WAV files encoder : Generate V.23 audio signal 
 Vidéotex files (*.vdt) to BMP and WAV files. Contains an Vidéotex emulator and generate V.23 audio signal to replay from a video file videotex pages on the real hardware. It is able to generate video files from multiples VDT files.
 
 # Etude technique du Minitel
+
+Note : Il ne s'agit ici que d'un simple extrait de la page d'origine, bien plus complète aujourd'hui :
+[**http://hxc2001.free.fr/minitel/index.html**](http://hxc2001.free.fr/minitel/index.html)
 
 Le but de cette projet est de présenter les résultats de l'étude technique du Minitel que j'ai réalisé il y a quelques années.
 Mais pourquoi faire le reverse engineering du Minitel, objet complètement démodé, aux capacités apparemment très limitées ?
