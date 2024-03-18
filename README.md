@@ -24,6 +24,7 @@ Vidéotex files (*.vdt) to BMP and WAV files. Contains an Vidéotex emulator and
 # Etude technique du Minitel
 
 Note : Il ne s'agit ici que d'un simple extrait de la page d'origine, bien plus complète aujourd'hui :
+
 [**http://hxc2001.free.fr/minitel/index.html**](http://hxc2001.free.fr/minitel/index.html)
 
 Le but de cette projet est de présenter les résultats de l'étude technique du Minitel que j'ai réalisé il y a quelques années.
