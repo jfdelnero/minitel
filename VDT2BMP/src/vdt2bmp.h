@@ -76,6 +76,8 @@ typedef struct app_ctx_
 	envvar_entry * env;
 
 	int zoom;
+
+	void * ws_ctx;
 }app_ctx;
 
 enum {

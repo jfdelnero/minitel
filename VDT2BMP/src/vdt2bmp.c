@@ -75,6 +75,8 @@ Available command line options :
 #include "modem.h"
 #include "dtmf.h"
 
+#include "ws.h"
+
 #include "FIR/band_pass_rx_Filter.h"
 #include "FIR/low_pass_tx_Filter.h"
 
@@ -374,6 +376,28 @@ void * ScriptServerThreadProc( void *lpParameter )
 	return 0;
 }
 
+void * WsRxThreadProc( void *lpParameter )
+{
+	app_ctx * ctx;
+	unsigned char c;
+
+	ctx = (app_ctx *)lpParameter;
+
+	while(1)
+	{	
+		while ( is_fifo_empty(&ctx->mdm->rx_fifo[1]) )
+		{
+			usleep(4000);
+		}
+
+		pop_from_fifo(&ctx->mdm->rx_fifo[1], &c);
+
+		ws_send(ctx->ws_ctx, c);
+	}
+
+	return 0;
+}
+
 int32_t create_audioin_thread(app_ctx * ctx)
 {
 	uint32_t sit;
@@ -423,6 +447,34 @@ int32_t create_script_thread(app_ctx * ctx)
 	{
 	#ifdef DEBUG
 		printf("create_script_thread : pthread_create failed -> %d",ret);
+	#endif
+	}
+
+	return sit;
+}
+
+int32_t create_rx_ws_thread(app_ctx * ctx)
+{
+	uint32_t sit;
+	pthread_t threadid;
+	pthread_attr_t threadattrib;
+	int ret;
+
+	sit = 0;
+
+	//pthread_attr_create(&threadattrib);
+	pthread_attr_init(&threadattrib);
+	pthread_attr_setinheritsched(&threadattrib,PTHREAD_EXPLICIT_SCHED);
+
+	pthread_attr_setschedpolicy(&threadattrib,SCHED_FIFO);
+	/* set the new scheduling param */
+	//pthread_attr_setschedparam (&threadattrib, &param);
+
+	ret = pthread_create(&threadid,0,WsRxThreadProc, ctx);
+	if(ret)
+	{
+	#ifdef DEBUG
+		printf("create_rx_ws_thread : pthread_create failed -> %d",ret);
 	#endif
 	}
 
@@ -1332,6 +1384,53 @@ int main(int argc, char* argv[])
 	if(isOption(argc,argv,"sdlout",NULL)>0)
 	{
 		outmode = OUTPUT_MODE_SDL;
+	}
+
+	if(isOption(argc,argv,"ws",NULL)>0)
+	{
+#ifdef SDL_SUPPORT
+		appctx.ws_ctx = init_ws((void *)&appctx);
+		if(appctx.ws_ctx)
+		{
+			vdt_ctx = vdt_init();
+
+			appctx.vdt_ctx = vdt_ctx;
+
+			vdt_ctx->framerate = framerate;
+
+			vdt_load_charset(vdt_ctx, NULL);
+
+			vdt_select_palette(vdt_ctx, pal);
+
+			mdm_init(&mdm_ctx);
+			appctx.mdm = &mdm_ctx;
+
+			dtmf_init(&dtmfctx,mdm_ctx.sample_rate);
+			appctx.dtmfctx = &dtmfctx;
+
+			appctx.timeout_seconds = 4*60;
+
+			appctx.snd_event = createevent();
+
+			appctx.sound_fifo.page_size = DEFAULT_SOUND_BUFFER_SIZE;
+			appctx.sound_fifo.snd_buf = malloc( appctx.sound_fifo.page_size * 16 * sizeof(short) );
+			memset((void*)appctx.sound_fifo.snd_buf,0,appctx.sound_fifo.page_size * 16 * sizeof(short));
+
+			low_pass_tx_Filter_init(&appctx.tx_fir);
+
+			create_audioin_thread(&appctx);
+
+			create_rx_ws_thread(&appctx);
+
+			SDL_app_loop( &appctx, audio_in_id, audio_out_id );
+
+			deinit_ws(appctx.ws_ctx);
+		}
+
+
+#else
+		fprintf(stderr, "ERROR : No built-in SDL support !\n");
+#endif
 	}
 
 	// Animation generator
