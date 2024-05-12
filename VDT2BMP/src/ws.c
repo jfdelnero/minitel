@@ -33,6 +33,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #include "env.h"
 #include "cache.h"
