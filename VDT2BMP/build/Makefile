@@ -6,7 +6,7 @@ DEBUG ?= 0
 
 ifeq ($(DEBUG), 1)
 	CFLAGS=-O0 $(INCLUDES) -Wall -g
-	LDFLAGS= -lm -lpthread -lasan
+	LDFLAGS= -lm -lpthread #-lasan
 else
 	CFLAGS=-O3 $(INCLUDES) -Wall
 	LDFLAGS= -lm -s
@@ -81,13 +81,13 @@ endif
 
 all: $(EXEC)
 
-$(EXEC):  vdt2bmp.o videotex.o script_exec.o env.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o band_pass_rx_Filter.o low_pass_tx_Filter.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
+$(EXEC):  vdt2bmp.o videotex.o fifo.o script_exec.o env.o bmp_file.o cache.o modem.o dtmf.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o band_pass_rx_Filter.o low_pass_tx_Filter.o vdt_test_001.o vdt_test_002.o vdt_test_003.o ws.o wsclient.o base64.o sha1.o
 	$(CC) -o $@    $^ $(LDFLAGS)
 
-vdt2bmp_asmjs.js:  vdt2bmp.o videotex.o script_exec.o env.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o band_pass_rx_Filter.o low_pass_tx_Filter.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
+vdt2bmp_asmjs.js:  vdt2bmp.o videotex.o fifo.o script_exec.o env.o bmp_file.o cache.o modem.o dtmf.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o band_pass_rx_Filter.o low_pass_tx_Filter.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
 	$(CC) -o $@    $^ $(LDFLAGS)
 
-vdt2bmp_wasm.js:  vdt2bmp.o videotex.o script_exec.o env.o bmp_file.o cache.o modem.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o band_pass_rx_Filter.o low_pass_tx_Filter.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
+vdt2bmp_wasm.js:  vdt2bmp.o videotex.o fifo.o script_exec.o env.o bmp_file.o cache.o modem.o dtmf.o teletel_font.o ef9345_font.o FIR_V22_Minitel.o band_pass_rx_Filter.o low_pass_tx_Filter.o vdt_test_001.o vdt_test_002.o vdt_test_003.o
 	$(CC) -o $@    $^ $(LDFLAGS_WASM)
 
 vdt2bmp.o: ../src/vdt2bmp.c
@@ -104,6 +104,18 @@ cache.o: ../src/cache.c
 
 modem.o: ../src/modem.c
 	$(CC) -o $@ -c $< $(CFLAGS)
+
+dtmf.o: ../src/dtmf.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+fifo.o: ../src/fifo.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+#messages.o: ../src/messages.c
+#	$(CC) -o $@ -c $< $(CFLAGS)
+
+#network.o: ../src/network.c
+#	$(CC) -o $@ -c $< $(CFLAGS)
 
 teletel_font.o: ../src/teletel_font.c
 	$(CC) -o $@ -c $< $(CFLAGS)
@@ -133,6 +145,18 @@ vdt_test_002.o: ../src/data/vdt_test_002.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 vdt_test_003.o: ../src/data/vdt_test_003.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+base64.o: ../src/libwsclient/base64.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+sha1.o: ../src/libwsclient/sha1.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+wsclient.o: ../src/libwsclient/wsclient.c
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+ws.o: ../src/ws.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 clean:
