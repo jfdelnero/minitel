@@ -8,10 +8,22 @@
 
 #include <stdint.h>
 #include <pthread.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <sys/un.h>
 #include <stddef.h>
+#include <unistd.h>
+
+#ifdef	WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#include <commctrl.h>
+#else
+#include <netdb.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/un.h>
+#endif
 
 #ifdef HAVE_LIBSSL
 #include <openssl/ssl.h>
@@ -96,7 +108,11 @@ typedef struct _wsclient_error {
 } wsclient_error;
 
 typedef struct _wsclient {
+
+#ifdef HELPER_SUPPORT
 	pthread_t helper_thread;
+#endif
+
 	pthread_t handshake_thread;
 	pthread_t run_thread;
 	pthread_mutex_t lock;
@@ -109,8 +125,11 @@ typedef struct _wsclient {
 	int (*onerror)(struct _wsclient *, wsclient_error *err);
 	int (*onmessage)(struct _wsclient *, wsclient_message *msg);
 	wsclient_frame *current_frame;
+
+#ifdef HELPER_SUPPORT
 	struct sockaddr_un helper_sa;
 	int helper_sock;
+#endif
 
 	void * app_ctx;
 #ifdef HAVE_LIBSSL

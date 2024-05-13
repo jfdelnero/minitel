@@ -35,6 +35,10 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include <errno.h>
+#include <sys/time.h>
+#include <pthread.h>
+
 #include "env.h"
 #include "cache.h"
 #include "wave.h"

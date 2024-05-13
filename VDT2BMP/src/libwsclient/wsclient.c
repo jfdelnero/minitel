@@ -6,17 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <errno.h>
-#include <netdb.h>
 #include <sys/types.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/un.h>
-#include <signal.h>
-
-#include <pthread.h>
 
 #include "wsclient.h"
 #include "sha1.h"
@@ -100,9 +91,12 @@ void *libwsclient_run_thread(void *ptr) {
 
 void libwsclient_finish(wsclient *client) {
 	//TODO: handle UNIX socket helper thread shutdown better than killing it...  :P
+#ifdef HELPER_SUPPORT
 	if(client->helper_thread) {
 		pthread_kill(client->helper_thread, SIGINT);
 	}
+#endif
+
 	if(client->run_thread) {
 		pthread_join(client->run_thread, NULL);
 	}
@@ -401,6 +395,7 @@ int libwsclient_open_connection(const char *host, const char *port) {
 	return sockfd;
 }
 
+#ifdef HELPER_SUPPORT
 int libwsclient_helper_socket(wsclient *c, const char *path) {
 	socklen_t len;
 	int sockfd;
@@ -494,6 +489,7 @@ void *libwsclient_helper_socket_thread(void *ptr) {
 	}
 	return NULL;
 }
+#endif
 
 wsclient *libwsclient_new(const char *URI, void * app_ctx) {
 	wsclient *client = NULL;
