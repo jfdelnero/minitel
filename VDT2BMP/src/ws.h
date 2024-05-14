@@ -34,6 +34,6 @@ typedef struct websocket_ctx_
 	void * libwsclient_ctx;
 }websocket_ctx;
 
-void * init_ws(void * app_ctx);
+void * init_ws(void * app_ctx, char * uri);
 void ws_send(void *ws, unsigned char c);
 void deinit_ws(void *ws);

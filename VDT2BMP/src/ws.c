@@ -54,17 +54,20 @@
 #include "ws.h"
 #include "libwsclient/wsclient.h"
 
-int onclose(wsclient *c) {
-	fprintf(stderr, "ws onclose called: %d\n", c->sockfd);
+int onclose(wsclient *c)
+{
+	//fprintf(stderr, "ws onclose called: %d\n", c->sockfd);
 	return 0;
 }
 
-int onerror(wsclient *c, wsclient_error *err) {
+int onerror(wsclient *c, wsclient_error *err)
+{
 	fprintf(stderr, "ws onerror: (%d): %s\n", err->code, err->str);
 	return 0;
 }
 
-int onmessage(wsclient *c, wsclient_message *msg) {
+int onmessage(wsclient *c, wsclient_message *msg)
+{
 	int i;
 	app_ctx * ctx;
 
@@ -82,23 +85,28 @@ int onmessage(wsclient *c, wsclient_message *msg) {
 	return 0;
 }
 
-int onopen(wsclient *c) {
-	fprintf(stderr, "ws onopen called: %d\n", c->sockfd);
+int onopen(wsclient *c)
+{
+	//fprintf(stderr, "ws onopen called: %d\n", c->sockfd);
 	return 0;
 }
 
-void * init_ws(void * app_ctx)
+void * init_ws(void * app_ctx, char * uri)
 {
 	websocket_ctx * ctx;
 	wsclient *client;
+
+	fprintf(stderr, "Opening websocket connection to %s ...\n",uri);
 
 	ctx = malloc(sizeof(websocket_ctx));
 	if(ctx)
 	{
 		memset(ctx,0,sizeof(websocket_ctx));
 
-		client = libwsclient_new("ws://go.minipavi.fr:8182", app_ctx);
-		if(!client) {
+		client = libwsclient_new(uri, app_ctx);
+
+		if(!client)
+		{
 			fprintf(stderr, "Unable to initialize new WS client.\n");
 			free(ctx);
 			return NULL;

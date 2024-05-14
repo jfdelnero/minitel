@@ -384,7 +384,7 @@ void * WsRxThreadProc( void *lpParameter )
 	ctx = (app_ctx *)lpParameter;
 
 	while(1)
-	{	
+	{
 		while ( is_fifo_empty(&ctx->mdm->rx_fifo[1]) )
 		{
 			usleep(4000);
@@ -579,6 +579,7 @@ void printhelp(char* argv[])
 	fprintf(stderr,"  -ani\t\t\t\t: generate animation\n");
 #ifdef SDL_SUPPORT
 	fprintf(stderr,"  -server:[script path]\t\t: Server mode\n");
+	fprintf(stderr,"  -ws:[websocket server url]\t: Websocket client mode\n");
 	fprintf(stderr,"  -disable_window\t\t: disable window\n");
 	fprintf(stderr,"  -mic\t\t\t\t: Use the Microphone/Input line instead of files\n");
 	fprintf(stderr,"  -audio_list\t\t\t: List the available audio input(s)/output(s)\n");
@@ -1123,6 +1124,7 @@ int main(int argc, char* argv[])
 {
 	char filename[512];
 	char ofilename[512];
+	char uri[512];
 	char strtmp[1024];
 	modem_ctx mdm_ctx;
 	dtmf_ctx dtmfctx;
@@ -1386,48 +1388,48 @@ int main(int argc, char* argv[])
 		outmode = OUTPUT_MODE_SDL;
 	}
 
-	if(isOption(argc,argv,"ws",NULL)>0)
+	if(isOption(argc,argv,"ws",(char*)&uri)>0 || isOption(argc,argv,"ws",NULL)>0 )
 	{
 #ifdef SDL_SUPPORT
-		appctx.ws_ctx = init_ws((void *)&appctx);
+		if(!strlen(uri))
+			strcpy(uri,"ws://go.minipavi.fr:8182");
+
+		vdt_ctx = vdt_init();
+
+		appctx.vdt_ctx = vdt_ctx;
+
+		vdt_ctx->framerate = framerate;
+
+		vdt_load_charset(vdt_ctx, NULL);
+
+		vdt_select_palette(vdt_ctx, pal);
+
+		mdm_init(&mdm_ctx);
+		appctx.mdm = &mdm_ctx;
+
+		dtmf_init(&dtmfctx,mdm_ctx.sample_rate);
+		appctx.dtmfctx = &dtmfctx;
+
+		appctx.timeout_seconds = 4*60;
+
+		appctx.snd_event = createevent();
+
+		appctx.sound_fifo.page_size = DEFAULT_SOUND_BUFFER_SIZE;
+		appctx.sound_fifo.snd_buf = malloc( appctx.sound_fifo.page_size * 16 * sizeof(short) );
+		memset((void*)appctx.sound_fifo.snd_buf,0,appctx.sound_fifo.page_size * 16 * sizeof(short));
+
+		low_pass_tx_Filter_init(&appctx.tx_fir);
+
+		create_audioin_thread(&appctx);
+
+		appctx.ws_ctx = init_ws((void *)&appctx,(char*)uri);
 		if(appctx.ws_ctx)
 		{
-			vdt_ctx = vdt_init();
-
-			appctx.vdt_ctx = vdt_ctx;
-
-			vdt_ctx->framerate = framerate;
-
-			vdt_load_charset(vdt_ctx, NULL);
-
-			vdt_select_palette(vdt_ctx, pal);
-
-			mdm_init(&mdm_ctx);
-			appctx.mdm = &mdm_ctx;
-
-			dtmf_init(&dtmfctx,mdm_ctx.sample_rate);
-			appctx.dtmfctx = &dtmfctx;
-
-			appctx.timeout_seconds = 4*60;
-
-			appctx.snd_event = createevent();
-
-			appctx.sound_fifo.page_size = DEFAULT_SOUND_BUFFER_SIZE;
-			appctx.sound_fifo.snd_buf = malloc( appctx.sound_fifo.page_size * 16 * sizeof(short) );
-			memset((void*)appctx.sound_fifo.snd_buf,0,appctx.sound_fifo.page_size * 16 * sizeof(short));
-
-			low_pass_tx_Filter_init(&appctx.tx_fir);
-
-			create_audioin_thread(&appctx);
-
 			create_rx_ws_thread(&appctx);
-
 			SDL_app_loop( &appctx, audio_in_id, audio_out_id );
-
-			deinit_ws(appctx.ws_ctx);
 		}
 
-
+		deinit_ws(appctx.ws_ctx);
 #else
 		fprintf(stderr, "ERROR : No built-in SDL support !\n");
 #endif
