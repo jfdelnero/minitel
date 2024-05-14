@@ -31,8 +31,6 @@
 #include <openssl/crypto.h>
 #endif
 
-
-
 #define FRAME_CHUNK_LENGTH 1024
 #define HELPER_RECV_BUF_SIZE 1024
 
@@ -57,7 +55,6 @@
 #define WS_EXIT_PTHREAD_CREATE -3
 #define WS_EXIT_BAD_SCHEME -4
 
-
 #define WS_OPEN_CONNECTION_ADDRINFO_ERR -1
 #define WS_OPEN_CONNECTION_ADDRINFO_EXHAUSTED_ERR -2
 #define WS_RUN_THREAD_RECV_ERR -3
@@ -81,7 +78,8 @@
 #define WS_HELPER_BIND_ERR -21
 #define WS_HELPER_LISTEN_ERR -22
 
-typedef struct _wsclient_frame {
+typedef struct _wsclient_frame
+{
 	unsigned int fin;
 	unsigned int opcode;
 	unsigned int mask_offset;
@@ -95,19 +93,22 @@ typedef struct _wsclient_frame {
 	unsigned char mask[4];
 } wsclient_frame;
 
-typedef struct _wsclient_message {
+typedef struct _wsclient_message
+{
 	unsigned int opcode;
 	unsigned long long payload_len;
 	char *payload;
 } wsclient_message;
 
-typedef struct _wsclient_error {
+typedef struct _wsclient_error
+{
 	int code;
 	int extra_code;
 	char *str;
 } wsclient_error;
 
-typedef struct _wsclient {
+typedef struct _wsclient 
+{
 
 #ifdef HELPER_SUPPORT
 	pthread_t helper_thread;
@@ -143,7 +144,6 @@ typedef struct _wsclient {
 
 } wsclient;
 
-
 //Function defs
 wsclient *libwsclient_new(const char *URI, void * app_ctx);
 wsclient_error *libwsclient_new_error(int errcode);
@@ -169,7 +169,6 @@ extern char *errors[];
 extern int libwsclient_flags; //global flags variable
 
 int libwsclient_send_fragment(wsclient *client, char *strdata, int len, int flags);
-
 
 void libwsclient_onopen(wsclient *client, int (*cb)(wsclient *c));
 void libwsclient_onclose(wsclient *client, int (*cb)(wsclient *c));
