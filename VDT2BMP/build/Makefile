@@ -32,7 +32,7 @@ endif
 ifeq ($(TARGET), mingw32)
 	CC=i686-w64-mingw32-gcc
 	RESC=i686-w64-mingw32-windres
-	LDFLAGS += -static-libgcc -lpthread -Wl,-Map=output.map --static
+	LDFLAGS += -static-libgcc -lws2_32 -lpthread -Wl,-Map=output.map --static
 	CFLAGS += -I./SDL2-2.28.4/i686-w64-mingw32/include/
 	EXEC=vdt2bmp.exe
 endif
@@ -40,7 +40,7 @@ endif
 ifeq ($(TARGET), mingw64)
 	CC=x86_64-w64-mingw32-gcc
 	RESC=x86_64-w64-mingw32-windres
-	LDFLAGS += -static-libgcc -lpthread -Wl,-Map=output.map --static
+	LDFLAGS += -static-libgcc -lws2_32 -lpthread -Wl,-Map=output.map --static
 	CFLAGS += -I./SDL2-2.28.4/x86_64-w64-mingw32/include/
 	EXEC=vdt2bmp.exe
 endif
