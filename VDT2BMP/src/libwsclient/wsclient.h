@@ -136,6 +136,11 @@ typedef struct _wsclient {
 	SSL_CTX *ssl_ctx;
 	SSL *ssl;
 #endif
+
+#ifdef WIN32
+	WSADATA wsaData;
+#endif
+
 } wsclient;
 
 

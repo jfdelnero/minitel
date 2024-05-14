@@ -443,8 +443,6 @@ void *libwsclient_helper_socket_thread(void *ptr) {
 	char recv_buf[HELPER_RECV_BUF_SIZE];
 	char secondary_buf[HELPER_RECV_BUF_SIZE];
 
-
-
 	for(;;) { //TODO: some way to cleanly break this loop
 		len = sizeof(remote);
 
@@ -493,13 +491,26 @@ void *libwsclient_helper_socket_thread(void *ptr) {
 
 wsclient *libwsclient_new(const char *URI, void * app_ctx) {
 	wsclient *client = NULL;
+#ifdef WIN32
+	int iResult;
+#endif
 
 	client = (wsclient *)malloc(sizeof(wsclient));
 	if(!client) {
 		fprintf(stderr, "Unable to allocate memory in libwsclient_new.\n");
 		exit(WS_EXIT_MALLOC);
 	}
+
 	memset(client, 0, sizeof(wsclient));
+
+#ifdef WIN32
+	iResult = WSAStartup(MAKEWORD(2,2), &client->wsaData);
+	if (iResult != NO_ERROR)
+	{
+		free(client);
+		return (void*)NULL;
+	}
+#endif
 
 	client->app_ctx = app_ctx;
 
@@ -507,16 +518,19 @@ wsclient *libwsclient_new(const char *URI, void * app_ctx) {
 		fprintf(stderr, "Unable to init mutex in libwsclient_new.\n");
 		exit(WS_EXIT_PTHREAD_MUTEX_INIT);
 	}
+
 	if(pthread_mutex_init(&client->send_lock, NULL) != 0) {
 		fprintf(stderr, "Unable to init send lock in libwsclient_new.\n");
 		exit(WS_EXIT_PTHREAD_MUTEX_INIT);
 	}
 	pthread_mutex_lock(&client->lock);
+
 	client->URI = (char *)malloc(strlen(URI)+1);
 	if(!client->URI) {
 		fprintf(stderr, "Unable to allocate memory in libwsclient_new.\n");
 		exit(WS_EXIT_MALLOC);
 	}
+
 	memset(client->URI, 0, strlen(URI)+1);
 	strcpy(client->URI, URI);
 	client->flags |= CLIENT_CONNECTING;
@@ -526,8 +540,10 @@ wsclient *libwsclient_new(const char *URI, void * app_ctx) {
 		fprintf(stderr, "Unable to create handshake thread.\n");
 		exit(WS_EXIT_PTHREAD_CREATE);
 	}
+
 	return client;
 }
+
 void *libwsclient_handshake_thread(void *ptr) {
 	wsclient *client = (wsclient *)ptr;
 	wsclient_error *err = NULL;
