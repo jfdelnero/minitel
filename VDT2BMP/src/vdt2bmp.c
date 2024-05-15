@@ -1694,6 +1694,7 @@ int main(int argc, char* argv[])
 	}
 
 	if( (isOption(argc,argv,"help",0)<=0) &&
+		(isOption(argc,argv,"ws",0)<=0)   &&
 		(isOption(argc,argv,"vdt",0)<=0)  &&
 		(isOption(argc,argv,"ani",0)<=0)  &&
 		(isOption(argc,argv,"mic",0)<=0)  &&
