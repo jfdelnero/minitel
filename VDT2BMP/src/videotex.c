@@ -1255,6 +1255,23 @@ void vdt_push_char(videotex_ctx * ctx, unsigned char c)
 
 			switch(c)
 			{
+				case 0x3B:
+					ctx->decoder_step = 0;
+					ctx->decoder_buffer[ctx->decoder_step++] = 0x1B;
+
+					next_decoder_state = 0x3B;
+					ctx->decoder_buffer[ctx->decoder_step++] = c;
+
+				break;
+
+				case 0x3A:
+					ctx->decoder_step = 0;
+					ctx->decoder_buffer[ctx->decoder_step++] = 0x1B;
+
+					next_decoder_state = 0x3A;
+					ctx->decoder_buffer[ctx->decoder_step++] = c;
+				break;
+
 				case 0x48:
 					LOG("Clignotement\n");
 					ctx->current_attributs = vdt_set_mask(ctx->current_attributs, ATTRIBUTS_BLINK_SHIFT, 0x1, 0x1);
@@ -1431,6 +1448,34 @@ void vdt_push_char(videotex_ctx * ctx, unsigned char c)
 															vdt_get_mask( tmp_attribs, ATTRIBUTS_BACKGROUND_C0LOR_SHIFT, ATTRIBUTS_BACKGROUND_C0LOR_MASK));
 
 				}
+			}
+		break;
+
+		case 0x3B:
+			ctx->decoder_buffer[ctx->decoder_step++] = c;
+
+			if(ctx->decoder_step >= 4)
+			{
+				for(i=0;i<ctx->decoder_step;i++)
+				{
+					printf("%.2X ",ctx->decoder_buffer[i]);
+				}
+				printf("\n");
+				ctx->decoder_state = 0x00;
+			}
+		break;
+
+		case 0x3A:
+			ctx->decoder_buffer[ctx->decoder_step++] = c;
+
+			if(ctx->decoder_step >= 4)
+			{
+				for(i=0;i<ctx->decoder_step;i++)
+				{
+					printf("%.2X ",ctx->decoder_buffer[i]);
+				}
+				printf("\n");
+				ctx->decoder_state = 0x00;
 			}
 		break;
 
