@@ -108,7 +108,7 @@ void libwsclient_finish(wsclient *client)
 
 	if(client->run_thread)
 	{
-		pthread_join(client->run_thread, NULL);
+		//pthread_join(client->run_thread, NULL);
 	}
 }
 
