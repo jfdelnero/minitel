@@ -958,6 +958,149 @@ void update_surface(app_ctx * appctx, uint8_t * pixels)
 	}
 }
 
+typedef struct keysdef_
+{
+	unsigned short sdl_code;
+	unsigned short ascii_code;
+	unsigned short shifted_code;
+	int press_cnt;
+}keysdef;
+
+/*
+Envoi 1341 -
+Suite 1348 -
+Retour 1342 -
+Repetition 1343 -
+Correction 1347 -
+Annulation 1345 -
+Guide 1344 -
+Sommaire 1346 -
+Sonnerie 136C
+Connexion/Fin 1349
+*/
+
+keysdef keyboard_def[]=
+{
+	{SDL_SCANCODE_A, 'q', 'Q', 0},
+	{SDL_SCANCODE_B, 'b', 'B', 0},
+	{SDL_SCANCODE_C, 'c', 'C', 0},
+	{SDL_SCANCODE_D, 'd', 'D', 0},
+	{SDL_SCANCODE_E, 'e', 'E', 0},
+	{SDL_SCANCODE_F, 'f', 'F', 0},
+	{SDL_SCANCODE_G, 'g', 'G', 0},
+	{SDL_SCANCODE_H, 'h', 'H', 0},
+	{SDL_SCANCODE_I, 'i', 'I', 0},
+	{SDL_SCANCODE_J, 'j', 'J', 0},
+	{SDL_SCANCODE_K, 'k', 'K', 0},
+	{SDL_SCANCODE_L, 'l', 'L', 0},
+	{SDL_SCANCODE_M, ',', '?', 0},
+	{SDL_SCANCODE_N, 'n', 'N', 0},
+	{SDL_SCANCODE_O, 'o', 'O', 0},
+	{SDL_SCANCODE_P, 'p', 'P', 0},
+	{SDL_SCANCODE_Q, 'a', 'A', 0},
+	{SDL_SCANCODE_R, 'r', 'R', 0},
+	{SDL_SCANCODE_S, 's', 'S', 0},
+	{SDL_SCANCODE_T, 't', 'T', 0},
+	{SDL_SCANCODE_U, 'u', 'U', 0},
+	{SDL_SCANCODE_V, 'v', 'V', 0},
+	{SDL_SCANCODE_W, 'z', 'Z', 0},
+	{SDL_SCANCODE_X, 'x', 'X', 0},
+	{SDL_SCANCODE_Y, 'y', 'Y', 0},
+	{SDL_SCANCODE_Z, 'w', 'W', 0},
+
+	{SDL_SCANCODE_0, '0', '0', 0},
+	{SDL_SCANCODE_1, '1', '1', 0},
+	{SDL_SCANCODE_2, '2', '2', 0},
+	{SDL_SCANCODE_3, '3', '3', 0},
+	{SDL_SCANCODE_4, '4', '4', 0},
+	{SDL_SCANCODE_5, '5', '5', 0},
+	{SDL_SCANCODE_6, '6', '6', 0},
+	{SDL_SCANCODE_7, '7', '7', 0},
+	{SDL_SCANCODE_8, '8', '8', 0},
+	{SDL_SCANCODE_9, '9', '9', 0},
+
+	{SDL_SCANCODE_MINUS, '-', '-', 0},
+	{SDL_SCANCODE_EQUALS, '=', '+', 0},
+
+	{SDL_SCANCODE_SEMICOLON, 'm', 'M', 0},
+	{SDL_SCANCODE_COMMA, '.', '.', 0},
+	{SDL_SCANCODE_PERIOD, '/', ':', 0},
+	{SDL_SCANCODE_SLASH, '!', '§', 0},
+
+	{SDL_SCANCODE_SPACE, ' ', ' ', 0},
+
+	{SDL_SCANCODE_RETURN, 0x1341, 0x1341, 0},    // ENVOI
+
+	{SDL_SCANCODE_F1, 0x1344, 0x1344, 0},        // GUIDE
+	{SDL_SCANCODE_BACKSPACE, 0x1347, 0x1347, 0}, // CORRECTION
+	{SDL_SCANCODE_DELETE, 0x1345, 0x1345, 0},    // ANNULATION
+	{SDL_SCANCODE_PAGEUP, 0x1342, 0x1342, 0},    // RETOUR
+	{SDL_SCANCODE_PAGEDOWN, 0x1348, 0x1348, 0},  // SUITE
+
+	{SDL_SCANCODE_F2, 0x1348, 0x1348, 0},        // SOMMAIRE
+	{SDL_SCANCODE_F3, 0x1343, 0x1343, 0},        // REPETITION
+
+	{SDL_SCANCODE_F10, 0x1349, 0x1349, 0},       // CONNEXION / FIN
+
+	{0xff, 0xff, 0xff, -1}
+};
+
+void keyb_scan( app_ctx * appctx )
+{
+	int i;
+	unsigned short code;
+/*
+	for(i=0;i<256;i++)
+	{
+		if(appctx->keystate[i] )
+		{
+			printf("%d\n",i);
+		}
+	}
+
+	return;
+*/
+	i = 0;
+
+	while( keyboard_def[i].press_cnt >= 0 )
+	{
+		if( appctx->keystate[ keyboard_def[i].sdl_code ] )
+		{
+			if(!keyboard_def[i].press_cnt)
+			{
+				if( appctx->keystate[SDL_SCANCODE_LSHIFT] || appctx->keystate[SDL_SCANCODE_RSHIFT] )
+				{
+					code = keyboard_def[i].shifted_code;
+				}
+				else
+				{
+					code = keyboard_def[i].ascii_code;
+				}
+
+				//printf("key pressed ! (%c)\n", code);
+
+				if (code < 0x100)
+				{
+					push_to_fifo(&appctx->mdm->rx_fifo[1], code);
+				}
+				else
+				{
+					push_to_fifo(&appctx->mdm->rx_fifo[1], code>>8);
+					push_to_fifo(&appctx->mdm->rx_fifo[1], code & 0xFF);
+				}
+			}
+
+			keyboard_def[i].press_cnt++;
+		}
+		else
+		{
+			keyboard_def[i].press_cnt = 0;
+		}
+
+		i++;
+	}
+}
+
 int SDL_app_loop( app_ctx * appctx, int audio_in_id, int audio_out_id)
 {
 	int audio_in_sdl_id;
@@ -980,6 +1123,20 @@ int SDL_app_loop( app_ctx * appctx, int audio_in_id, int audio_out_id)
 	SDL_Init(SDL_INIT_EVERYTHING);
 
 	appctx->keystate = SDL_GetKeyboardState(NULL);
+
+	printf("--------------------------------------\n");
+	printf("Special function keys mapping\n\n");
+
+	printf("Envoi -> Return\n");
+	printf("Guide -> F1\n");
+	printf("Sommaire -> F2\n");
+	printf("Repetition -> F3\n");
+	printf("Connexion/Fin -> F10\n");
+	printf("Correction -> Backspace\n");
+	printf("Annulation -> Delete\n");
+	printf("Retour -> PageUp\n");
+	printf("Suite -> PageDown\n");
+	printf("\n");
 
 	if( appctx->io_cfg_flags & FLAGS_SDL_IO_SCREEN )
 	{
@@ -1073,12 +1230,9 @@ int SDL_app_loop( app_ctx * appctx, int audio_in_id, int audio_out_id)
 		}
 
 		lastUpdateTick = SDL_GetTicks();
-/*
-		if (appctx->keystate[SDL_SCANCODE_RIGHT])
-		{
-			printf("key pressed !\n");
-		}
-*/
+
+		keyb_scan( appctx );
+
 		if( screen && window )
 		{
 			if ( SDL_MUSTLOCK( screen ) )
