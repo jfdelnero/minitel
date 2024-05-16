@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2022-2023 Jean-François DEL NERO
+// Copyright (C) 2022-2024 Jean-François DEL NERO
 //
 // This file is part of vdt2bmp.
 //
@@ -27,7 +27,7 @@
 
 /*
 Videotex file (*.vdt) to bmp file converter
-(C) 2022-2023 Jean-François DEL NERO
+(C) 2022-2024 Jean-François DEL NERO
 
 Usage example : vdt2bmp -bmp:OUT.BMP a_vdt_file.vdt
 
@@ -1321,7 +1321,7 @@ int main(int argc, char* argv[])
 #endif
 
 	fprintf(stderr,"Minitel VDT to BMP converter v%s\n",STR_FILE_VERSION2);
-	fprintf(stderr,"Copyright (C) 2022-2023 Jean-Francois DEL NERO\n");
+	fprintf(stderr,"Copyright (C) 2022-2024 Jean-Francois DEL NERO\n");
 	fprintf(stderr,"This program comes with ABSOLUTELY NO WARRANTY\n");
 	fprintf(stderr,"This is free software, and you are welcome to redistribute it\n");
 	fprintf(stderr,"under certain conditions;\n\n");
