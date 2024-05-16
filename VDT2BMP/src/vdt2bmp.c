@@ -1011,7 +1011,7 @@ keysdef keyboard_def[]=
 	{SDL_SCANCODE_0, '0', '0', 0},
 	{SDL_SCANCODE_1, '1', '1', 0},
 	{SDL_SCANCODE_2, '2', '2', 0},
-	{SDL_SCANCODE_3, '3', '3', 0},
+	{SDL_SCANCODE_3, '3', '#', 0},
 	{SDL_SCANCODE_4, '4', '4', 0},
 	{SDL_SCANCODE_5, '5', '5', 0},
 	{SDL_SCANCODE_6, '6', '6', 0},
@@ -1019,6 +1019,7 @@ keysdef keyboard_def[]=
 	{SDL_SCANCODE_8, '8', '8', 0},
 	{SDL_SCANCODE_9, '9', '9', 0},
 
+	{SDL_SCANCODE_BACKSLASH, '*', '*', 0},
 	{SDL_SCANCODE_MINUS, '-', '-', 0},
 	{SDL_SCANCODE_EQUALS, '=', '+', 0},
 
@@ -1037,7 +1038,7 @@ keysdef keyboard_def[]=
 	{SDL_SCANCODE_PAGEUP, 0x1342, 0x1342, 0},    // RETOUR
 	{SDL_SCANCODE_PAGEDOWN, 0x1348, 0x1348, 0},  // SUITE
 
-	{SDL_SCANCODE_F2, 0x1348, 0x1348, 0},        // SOMMAIRE
+	{SDL_SCANCODE_F2, 0x1346, 0x1346, 0},        // SOMMAIRE
 	{SDL_SCANCODE_F3, 0x1343, 0x1343, 0},        // REPETITION
 
 	{SDL_SCANCODE_F10, 0x1349, 0x1349, 0},       // CONNEXION / FIN
