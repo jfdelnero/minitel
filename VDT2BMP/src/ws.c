@@ -56,7 +56,7 @@
 
 int onclose(wsclient *c)
 {
-	//fprintf(stderr, "ws onclose called: %d\n", c->sockfd);
+	fprintf(stderr, "Websocket connection closed !\n");
 	return 0;
 }
 
