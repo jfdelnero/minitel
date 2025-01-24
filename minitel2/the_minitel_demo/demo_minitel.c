@@ -105,6 +105,7 @@ void wait(uint16_t ms)
 // music tick int
 void music_timer_isr (void) __interrupt (TF1_VECTOR) //__using (1)
 {
+#if defined(MINITEL_NFZ400)
 	if(musicptr2>2)
 	{
 		musicptr2=0;
@@ -126,9 +127,11 @@ void music_timer_isr (void) __interrupt (TF1_VECTOR) //__using (1)
 	}
 
 	musicptr2++;
+#endif
 
-    TH1 = 0x07;
-    TL1 = 0xF0;
+    uint16_t reload_value = TIMER16_RELOAD_VALUE(53222);
+    TH1 = reload_value >> 8;
+    TL1 = reload_value & 0xff;
 }
 
 // timer tick int
@@ -144,8 +147,10 @@ void timer_isr (void) __interrupt (TF0_VECTOR) //__using (1)
 			start_tick=0;
 		}
 	}
-	TH0=0x1F;
-	TL0=0xF0;
+
+	uint16_t reload_value = TIMER16_RELOAD_VALUE(48073);
+	TH0 = reload_value >> 8;
+	TL0 = reload_value & 0xff;
 }
 
 void nyan_cat_sc()
@@ -162,20 +167,20 @@ void nyan_cat_sc()
 	k=0;
 	l=0;
 
-	TS9347_R1=0x7f;//txt_start[i];
-	TS9347_R2=0x01;
+	VIDEO_R1=0x7f;//txt_start[i];
+	VIDEO_R2=0x01;
 
 
 	for(j=0;j<24;j++)
 	{
-		WAIT_TS9347;
+		WAIT_VIDEO_BUSY;
 		set_ptr(0+xstart,j+ystart,0,0);
 		for(i=0;i<40;i++)
 		{
-			WAIT_TS9347;
+			WAIT_VIDEO_BUSY;
 
-			TS9347_R3=0x01 | (0x10);
-			TS9347_ER0=CMD_TLM|0x01;
+			VIDEO_R3=0x01 | (0x10);
+			VIDEO_ER0=CMD_TLM|0x01;
 			k++;
 		}
 	}
@@ -184,15 +189,15 @@ void nyan_cat_sc()
 	{
 		for(j=0;j<22;j++)
 		{
-			WAIT_TS9347;
+			WAIT_VIDEO_BUSY;
 			set_ptr(0,1+j+ystart,0,0);
 			for(i=0;i<40;i++)
 			{
 				//write_to_modem_dtmf(2,RDTMF);
-				WAIT_TS9347;
+				WAIT_VIDEO_BUSY;
 
-				TS9347_R3=0x01 | (nyan_cat[k]<<4);
-				TS9347_ER0=CMD_TLM|0x01;
+				VIDEO_R3=0x01 | (nyan_cat[k]<<4);
+				VIDEO_ER0=CMD_TLM|0x01;
 				k++;
 			}
 		}
@@ -241,23 +246,26 @@ void start_screen()
 		}
 		else
 		{
-			WAIT_TS9347;
+			WAIT_VIDEO_BUSY;
 			set_ptr(x+xstart,y+ystart,0,0);
-
+#if defined(MINITEL_NFZ400)
 			write_to_modem_dtmf(2,RDTMF);
-			WAIT_TS9347;
+#endif
+			WAIT_VIDEO_BUSY;
 
-			TS9347_R1=txt_start[i];
-			TS9347_R2=0x01;
-			TS9347_R3=0x71;
-			TS9347_ER0=CMD_TLM|0x01;
+			VIDEO_R1=txt_start[i];
+			VIDEO_R2=0x01;
+			VIDEO_R3=0x71;
+			VIDEO_ER0=CMD_TLM|0x01;
 
 			x++;
 			timer_tick=0;
 			do{
 			}while(timer_tick<1);
 
+#if defined(MINITEL_NFZ400)
 			write_to_modem(2,RDTMF);
+#endif
 		}
 		i++;
 	}
@@ -286,33 +294,33 @@ void start_screen()
 			k=scroll_start_offset_b+y;
 			k=k%20;
 
-			WAIT_TS9347;
-			TS9347_R2=0x01;
-			TS9347_R3=0x37;
+			WAIT_VIDEO_BUSY;
+			VIDEO_R2=0x01;
+			VIDEO_R3=0x37;
 			set_ptr(x+xstart,y+ystart,0,0);
 
 			x=0;
-			TS9347_R3=0x07 | ((i&7)<<4);
+			VIDEO_R3=0x07 | ((i&7)<<4);
 			while(x<40)
 			{
-				WAIT_TS9347;
-				TS9347_R1=txt_scroll[i];
-				TS9347_ER0=CMD_TLM|0x01;
+				WAIT_VIDEO_BUSY;
+				VIDEO_R1=txt_scroll[i];
+				VIDEO_ER0=CMD_TLM|0x01;
 				i++;
 				if(!txt_scroll[i]) i=0;
 				x++;
 			}
 
 			x=0;
-			WAIT_TS9347;
+			WAIT_VIDEO_BUSY;
 			set_ptr(x+xstart,(23-y)+ystart,0,0);
 
-			TS9347_R3=0x07 | ((i&7)<<4);
+			VIDEO_R3=0x07 | ((i&7)<<4);
 			while(x<40)
 			{
-				WAIT_TS9347;
-				TS9347_R1=txt_scroll[k];
-				TS9347_ER0=CMD_TLM|0x01;
+				WAIT_VIDEO_BUSY;
+				VIDEO_R1=txt_scroll[k];
+				VIDEO_ER0=CMD_TLM|0x01;
 
 				k++;
 				if(!txt_scroll[k]) k=0;
@@ -508,10 +516,13 @@ void main(void)
 	uint8_t demostate;
 	uint16_t i,j,k,l;
 
-	init_ts9347();
+	init_video();
+
+#if defined(MINITEL_NFZ400)
 	init_modem();
 	hwctrlstatus=hwctrlstatus &(~( HW_CTRL_MODDTMF));
 	hw_ctrl_reg=hwctrlstatus;
+#endif
 
 	// init timer + it
 	IE=0;

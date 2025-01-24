@@ -32,9 +32,9 @@ extern volatile uint8_t hwctrlstatus;
 // Video functions
 //////////////////////////////////////////////////////////////////
 /*
-void wait_ts9347(void) _naked
+void wait_video(void) _naked
 {
-	while( TS9347_R0&0x80);
+	while( VIDEO_R0&0x80);
 }*/
 
 void clearscreen(void)
@@ -45,14 +45,14 @@ void clearscreen(void)
 	{
 		for(i=0;i<40;i++)
 		{
-			//wait_ts9347();
-			WAIT_TS9347;
+			//wait_video();
+			WAIT_VIDEO_BUSY;
 			set_ptr(i,j,0,0);
 
-			TS9347_R1=' ';
-			TS9347_R2=0x01;
-			TS9347_R3=0x37;
-			TS9347_ER0=CMD_TLM|0x01;
+			VIDEO_R1=' ';
+			VIDEO_R2=0x01;
+			VIDEO_R3=0x37;
+			VIDEO_ER0=CMD_TLM|0x01;
 		}
 	}
 }
@@ -61,76 +61,87 @@ void setbank(int8_t bank)
 {
 
 	/*
-	wait_ts9347();
-	TS9347_R1=0x08 | ((bank&1)<<5);
-	TS9347_ER0=CMD_IND|ROR_REG;
+	wait_video();
+	VIDEO_R1=0x08 | ((bank&1)<<5);
+	VIDEO_ER0=CMD_IND|ROR_REG;
 	*/
 
-	//wait_ts9347();
-	WAIT_TS9347;
+	//wait_video();
+	WAIT_VIDEO_BUSY;
 
 	if(bank==0)
-		TS9347_R1=0x26;
+		VIDEO_R1=0x26;
 	else
-		TS9347_R1=0x72;
+		VIDEO_R1=0x72;
 
-	TS9347_R6=0x0;
-	TS9347_R7=0x0;
-	TS9347_R5=0x0;
-	TS9347_R4=0x0;
-	TS9347_ER0=CMD_IND|DOR_REG;
+	VIDEO_R6=0x0;
+	VIDEO_R7=0x0;
+	VIDEO_R5=0x0;
+	VIDEO_R4=0x0;
+	VIDEO_ER0=CMD_IND|DOR_REG;
 
 }
 
-void init_ts9347(void)
+void init_video(void)
 {
-	TS9347_ER0=CMD_NOP;
-	//wait_ts9347();
-	WAIT_TS9347;
+	VIDEO_ER0=CMD_NOP;
+	//wait_video();
+	WAIT_VIDEO_BUSY;
 
-	//wait_ts9347();
-	WAIT_TS9347;
-	TS9347_R1=0x0C;
-	TS9347_ER0=CMD_IND|TGS_REG;
+#if defined(MINITEL_NFZ330)
+	WAIT_VIDEO_BUSY;
+	VIDEO_R1=0x10;
+	VIDEO_ER0=CMD_IND|TGS_REG;
 
-	//wait_ts9347();
-	WAIT_TS9347;
-	TS9347_R1=0x0C;
-	TS9347_ER0=CMD_IND|TGS_REG;
+	WAIT_VIDEO_BUSY;
+	VIDEO_R1=0x06;
+	VIDEO_ER0=CMD_IND|PAT_REG;
+#elif defined(MINITEL_NFZ400)
+	WAIT_VIDEO_BUSY;
+	VIDEO_R1=0x0C;
+	VIDEO_ER0=CMD_IND|TGS_REG;
 
-	WAIT_TS9347;
-	TS9347_R1=0x02;
-	TS9347_ER0=CMD_IND|PAT_REG;
+	//wait_video();
+	WAIT_VIDEO_BUSY;
+	VIDEO_R1=0x0C;
+	VIDEO_ER0=CMD_IND|TGS_REG;
 
-	WAIT_TS9347;
-	TS9347_R1=0x00;
-	TS9347_ER0=CMD_IND|MAT_REG;
+	WAIT_VIDEO_BUSY;
+	VIDEO_R1=0x02;
+	VIDEO_ER0=CMD_IND|PAT_REG;
+#else
+#error Please define one of the MINITEL_* macros
+#endif
 
-	WAIT_TS9347;
-	TS9347_ER0=CMD_VRM;
+	WAIT_VIDEO_BUSY;
+	VIDEO_R1=0x00;
+	VIDEO_ER0=CMD_IND|MAT_REG;
 
-	TS9347_R6=0;
-	TS9347_R7=0;
+	WAIT_VIDEO_BUSY;
+	VIDEO_ER0=CMD_VRM;
 
-	WAIT_TS9347;
-	TS9347_R1=0x08;
-	TS9347_ER0=CMD_IND|ROR_REG;
+	VIDEO_R6=0;
+	VIDEO_R7=0;
 
-	WAIT_TS9347;
-	TS9347_R1=0x26;
-	TS9347_R6=0x0;
-	TS9347_R7=0x0;
-	TS9347_R5=0x0;
-	TS9347_R4=0x0;
-	TS9347_ER0=CMD_IND|DOR_REG;
+	WAIT_VIDEO_BUSY;
+	VIDEO_R1=0x08;
+	VIDEO_ER0=CMD_IND|ROR_REG;
+
+	WAIT_VIDEO_BUSY;
+	VIDEO_R1=0x26;
+	VIDEO_R6=0x0;
+	VIDEO_R7=0x0;
+	VIDEO_R5=0x0;
+	VIDEO_R4=0x0;
+	VIDEO_ER0=CMD_IND|DOR_REG;
 
 	clearscreen();
 }
 
 void set_ptr(uint8_t X,uint8_t Y,uint8_t D,uint8_t B)
 {
-	TS9347_R6= (D<<5)|(Y&0x1F);
-	TS9347_R7=(B<<6)|(X&0x3F);
+	VIDEO_R6= (D<<5)|(Y&0x1F);
+	VIDEO_R7=(B<<6)|(X&0x3F);
 }
 
 void fillmosaic(uint8_t x,uint8_t y,uint8_t xsize,uint8_t ysize,uint8_t page) __reentrant
@@ -139,21 +150,21 @@ void fillmosaic(uint8_t x,uint8_t y,uint8_t xsize,uint8_t ysize,uint8_t page) __
 
 	c=0;
 
-	TS9347_R3=0x37;
+	VIDEO_R3=0x37;
 
 	for(i=0;i<ysize;i++)
 	{
 		for(j=0;j<xsize;j++)
 		{
 
-			WAIT_TS9347;
+			WAIT_VIDEO_BUSY;
 			set_ptr(j+x,i+8+y,0,0);
 
-			WAIT_TS9347;
-			TS9347_R1=c;
-			TS9347_R2=0xA5;
+			WAIT_VIDEO_BUSY;
+			VIDEO_R1=c;
+			VIDEO_R2=0xA5;
 
-			TS9347_ER0=CMD_TLM|0x01;
+			VIDEO_ER0=CMD_TLM|0x01;
 			c++;
 			if(c==4)  c=32;
 		}
@@ -166,8 +177,8 @@ void setcharset1010(const int8_t * databuffer) __reentrant
 	uint8_t i,j,c,k;
 	uint16_t ptr;
 	c=0;
-	TS9347_R6=0x0;
-	TS9347_R7=0x0;
+	VIDEO_R6=0x0;
+	VIDEO_R7=0x0;
 	ptr=0;
 	for(i=0;i<10;i++)
 	{
@@ -177,11 +188,11 @@ void setcharset1010(const int8_t * databuffer) __reentrant
 			{
 				c=j+(i*10);
 				if(c>3) c=32+(c-4);
-				WAIT_TS9347;
-				TS9347_R1= databuffer[ptr];
-				TS9347_R6= (0x20)|(c>>2);
-				TS9347_R7= 0x00 | (k<<2)|(c&0x3);
-				TS9347_ER0=CMD_TBM;
+				WAIT_VIDEO_BUSY;
+				VIDEO_R1= databuffer[ptr];
+				VIDEO_R6= (0x20)|(c>>2);
+				VIDEO_R7= 0x00 | (k<<2)|(c&0x3);
+				VIDEO_ER0=CMD_TBM;
 				ptr++;
 			}
 		}
@@ -194,8 +205,8 @@ void setcharset(int8_t * databuffer,uint8_t xsize,uint8_t ysize) __reentrant
 	uint8_t i,j,c,k;
 	uint16_t ptr;
 	c=0;
-	TS9347_R6=0x0;
-	TS9347_R7=0x0;
+	VIDEO_R6=0x0;
+	VIDEO_R7=0x0;
 	ptr=0;
 	for(i=0;i<ysize;i++)
 	{
@@ -205,11 +216,11 @@ void setcharset(int8_t * databuffer,uint8_t xsize,uint8_t ysize) __reentrant
 			{
 				c=j+(i*xsize);
 				if(c>3) c=32+(c-4);
-				WAIT_TS9347;
-				TS9347_R1= databuffer[ptr];
-				TS9347_R6= (0x20)|(c>>2);
-				TS9347_R7= 0x00 | (k<<2)|(c&0x3);
-				TS9347_ER0=CMD_TBM;
+				WAIT_VIDEO_BUSY;
+				VIDEO_R1= databuffer[ptr];
+				VIDEO_R6= (0x20)|(c>>2);
+				VIDEO_R7= 0x00 | (k<<2)|(c&0x3);
+				VIDEO_ER0=CMD_TBM;
 				ptr++;
 			}
 		}
@@ -224,12 +235,12 @@ void clearcharset(uint8_t ligne) __reentrant
 	uint16_t ptr;
 
 	c=0;
-	TS9347_R6=0x0;
-	TS9347_R7=0x0;
+	VIDEO_R6=0x0;
+	VIDEO_R7=0x0;
 	ptr=0;
 
-	WAIT_TS9347;
-	TS9347_R1= ligne;
+	WAIT_VIDEO_BUSY;
+	VIDEO_R1= ligne;
 
 	for(k=0;k<10;k++)
 	{
@@ -237,11 +248,11 @@ void clearcharset(uint8_t ligne) __reentrant
 		{
 			c=j;
 			if(c>3) c=32+(c-4);
-			WAIT_TS9347;
+			WAIT_VIDEO_BUSY;
 
-			TS9347_R6= (0x20)|(c>>2);
-			TS9347_R7= buffernb | (k<<2)|(c&0x3);
-			TS9347_ER0=CMD_TBM;
+			VIDEO_R6= (0x20)|(c>>2);
+			VIDEO_R7= buffernb | (k<<2)|(c&0x3);
+			VIDEO_ER0=CMD_TBM;
 			ptr++;
 		}
 	}
@@ -254,17 +265,18 @@ void clearcharset(uint8_t ligne) __reentrant
 			{
 				c=28 + j+(i*10);
 				//if(c>3) c=32+(c-4);
-				WAIT_TS9347;
+				WAIT_VIDEO_BUSY;
 
-				TS9347_R6= (0x20)|(c>>2);
-				TS9347_R7= buffernb | (k<<2)|(c&0x3);
-				TS9347_ER0=CMD_TBM;
+				VIDEO_R6= (0x20)|(c>>2);
+				VIDEO_R7= buffernb | (k<<2)|(c&0x3);
+				VIDEO_ER0=CMD_TBM;
 				ptr++;
 			}
 		}
 	}
 }
 
+#if defined(MINITEL_NFZ400)
 //////////////////////////////////////////////////////////////////
 // Modem functions
 //////////////////////////////////////////////////////////////////
@@ -381,4 +393,4 @@ void init_modem(void)
 	write_to_modem(0x3,RWLO);//0x3
 	write_to_modem(0x0,RPTF);
 }
-
+#endif

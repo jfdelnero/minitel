@@ -21,7 +21,9 @@
 ///////////////////////////////////////////////////////////////////////////////////
 
 void set_ptr(uint8_t X,uint8_t Y,uint8_t D,uint8_t B);
+
+#if defined(MINITEL_NFZ400)
 void write_to_modem(uint8_t datavalue,uint8_t address);
 void write_to_modem_dtmf(uint8_t datavalue,uint8_t address);
 void init_modem(void);
-
+#endif
