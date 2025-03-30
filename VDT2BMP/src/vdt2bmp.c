@@ -575,28 +575,30 @@ int isOption(int argc, char* argv[],char * paramtosearch,char * argtoparam)
 void printhelp(char* argv[])
 {
 	fprintf(stderr,"Options:\n");
-	fprintf(stderr,"  -bmp:[out_file.bmp] \t\t: generate bmp file(s)\n");
-	fprintf(stderr,"  -ani\t\t\t\t: generate animation\n");
+	fprintf(stderr,"  -bmp:[out_file.bmp] \t\t: Generate BMP file(s)\n");
+	fprintf(stderr,"  -ani\t\t\t\t: Generate animation (Simulate Minitel page loading)\n");
 #ifdef SDL_SUPPORT
 	fprintf(stderr,"  -server:[script path]\t\t: Server mode\n");
-	fprintf(stderr,"  -ws:[websocket server url]\t: Websocket client mode\n");
-	fprintf(stderr,"  -disable_window\t\t: disable window\n");
+	fprintf(stderr,"  -ws:[websocket server url]\t: Websocket client/bridge mode (default url : MiniPavi)\n");
+	fprintf(stderr,"  -disable_window\t\t: Disable videotex window\n");
 	fprintf(stderr,"  -mic\t\t\t\t: Use the Microphone/Input line instead of files\n");
 	fprintf(stderr,"  -audio_list\t\t\t: List the available audio input(s)/output(s)\n");
 	fprintf(stderr,"  -audio_in/audio_out:[id]\t: Select audio input/output to use\n");
-	fprintf(stderr,"  -show:[file.vdt]\t\t: Display a vdt file\n");
+	fprintf(stderr,"  -show:[file.vdt]\t\t: Display a VDT file\n");
 #endif
-	fprintf(stderr,"  -greyscale\t\t\t: greyscale display mode\n");
-	fprintf(stderr,"  -zoom:[1-8]\t\t\t: display zoom\n");
+	fprintf(stderr,"  -greyscale\t\t\t: Greyscale display mode\n");
+	fprintf(stderr,"  -zoom:[1-8]\t\t\t: Set display/window zoom\n");
 	fprintf(stderr,"  -stdout \t\t\t: stdout mode\n");
 	fprintf(stderr,"  -help \t\t\t: This help\n");
 	fprintf(stderr,"  \nExamples :\n");
-	fprintf(stderr,"  Animation: vdt2bmp -ani -fps:30 -stdout /path/*.vdt | ffmpeg -y -f rawvideo -pix_fmt argb -s 320x250 -r 30 -i - -an out_video.mkv\n");
-	fprintf(stderr,"  Video + audio merging : ffmpeg -i out_video.mkv -i out_audio.wav -c copy output.mkv\n");
-	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp /path/*.vdt\n");
-	fprintf(stderr,"  vdt to bmp convert : vdt2bmp -bmp:out.bmp /path/videotex.vdt\n");
+	fprintf(stderr,"  Animation \t\t\t: vdt2bmp -ani -fps:30 -stdout /path/*.vdt | ffmpeg -y -f rawvideo -pix_fmt argb -s 320x250 -r 30 -i - -an out_video.mkv\n");
+	fprintf(stderr,"  Video + audio merging \t: ffmpeg -i out_video.mkv -i out_audio.wav -c copy output.mkv\n");
+	fprintf(stderr,"  VDT to BMP conversion \t: vdt2bmp -bmp /path/*.vdt\n");
+	fprintf(stderr,"  VDT to BMP conversion \t: vdt2bmp -bmp:out.bmp /path/videotex.vdt\n");
 #ifdef SDL_SUPPORT
-	fprintf(stderr,"  Minitel server : vdt2bmp -server:vdt/script.txt -audio_out:1 -audio_in:1 -outfile:inscriptions.csv\n");
+	fprintf(stderr,"  Minitel server \t\t: vdt2bmp -server:vdt/script.txt -audio_out:1 -audio_in:1 -outfile:inscriptions.csv\n");
+	fprintf(stderr,"  MiniPavi to Minitel bridging\t: vdt2bmp -ws -zoom:2\n");
+	fprintf(stderr,"  Wepsocket to Minitel bridging\t: vdt2bmp -ws -zoom:2\n");
 #endif
 
 	fprintf(stderr,"\n");
