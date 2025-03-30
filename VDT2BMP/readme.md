@@ -51,16 +51,16 @@ Linux, target Windows (with mingw32), with SDL support (Full capability)
 
 ## Usage examples
 
-	**Animation**                 : vdt2bmp -ani -fps:30 -stdout /path/*.vdt | ffmpeg -y -f rawvideo -pix_fmt argb -s 320x250 -r 30 -i - -an out_video.mkv
-	**Video + audio merging**     : ffmpeg -i out_video.mkv -i out_audio.wav -c copy output.mkv
+	__Animation__                 : vdt2bmp -ani -fps:30 -stdout /path/*.vdt | ffmpeg -y -f rawvideo -pix_fmt argb -s 320x250 -r 30 -i - -an out_video.mkv
+	__Video + audio merging__     : ffmpeg -i out_video.mkv -i out_audio.wav -c copy output.mkv
 
-	**VDT to BMP conversion**     : vdt2bmp -bmp /path/*.vdt
-	**VDT to BMP conversion**     : vdt2bmp -bmp:out.bmp /path/videotex.vdt
+	__VDT to BMP conversion__     : vdt2bmp -bmp /path/*.vdt
+	__VDT to BMP conversion__     : vdt2bmp -bmp:out.bmp /path/videotex.vdt
 
-	**Minitel server**            : vdt2bmp -server:vdt/script.txt -audio_out:1 -audio_in:1 -outfile:inscriptions.csv
+	__Minitel server__            : vdt2bmp -server:vdt/script.txt -audio_out:1 -audio_in:1 -outfile:inscriptions.csv
 
-	**Bridge to MiniPavi**        : vdt2bmp -ws -zoom:2
-	**Bridge to another sercer**  : vdt2bmp -ws:ws://3615co.de/ws -zoom:2
+	__Bridge to MiniPavi__        : vdt2bmp -ws -zoom:2
+	__Bridge to another server__  : vdt2bmp -ws:ws://3615co.de/ws -zoom:2
 
 
 [![Watch the video](http://hxc2001.free.fr/minitel/pages_minitel/minitel_etam.png)](http://hxc2001.free.fr/minitel/pages_minitel/minitel_etam.mp4)
