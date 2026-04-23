@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2022-2024 Jean-François DEL NERO
+// Copyright (C) 2022-2026 Jean-François DEL NERO
 //
 // This file is part of vdt2bmp.
 //
@@ -27,7 +27,7 @@
 
 /*
 Videotex file (*.vdt) to bmp file converter
-(C) 2022-2024 Jean-François DEL NERO
+(C) 2022-2026 Jean-François DEL NERO
 
 Usage example : vdt2bmp -bmp:OUT.BMP a_vdt_file.vdt
 
@@ -227,7 +227,7 @@ void audio_out(void *ctx, Uint8 *stream, int len)
 
 #ifdef DBG_INJECT_SND
 	//if(indbgfile)
-	//	fread(stream,len,1,indbgfile);
+	//  fread(stream,len,1,indbgfile);
 #endif
 
 #if 0
@@ -315,7 +315,7 @@ void * AudioInThreadProc( void *lpParameter )
 
 #ifdef DBG_INJECT_SND
 				//if(outdbgfile)
-				//	fwrite(buf,ctx->sound_fifo.page_size*2,1,outdbgfile);
+				//  fwrite(buf,ctx->sound_fifo.page_size*2,1,outdbgfile);
 #endif
 
 				mdm_demodulate(mdm, &mdm->demodulators[1],(short *)buf, ctx->sound_fifo.page_size);
@@ -788,7 +788,47 @@ alloc_error:
 	return -3;
 }
 
-int write_bmp(char * vdt_file, char * bmp_file, int pal, int out_mode)
+void zoom_vdt(videotex_ctx * vdt_ctx, bitmap_data * bmp, int zoom)
+{
+	int bmp_res_x,bmp_res_y;
+	int x,y,zx,zy;
+	uint32_t * bmp_buffer,*dptr,*sptr;
+
+	if(zoom < 1)
+	{
+		zoom = 1;
+	}
+
+	bmp_res_x = vdt_ctx->bmp_res_x * zoom;
+	bmp_res_y = vdt_ctx->bmp_res_y * zoom;
+
+	bmp_buffer = malloc(bmp_res_x*bmp_res_y*sizeof(uint32_t));
+	if(!bmp_buffer)
+		return;
+
+	dptr=bmp_buffer;
+	for(y=0;y<vdt_ctx->bmp_res_y;y++)
+	{
+		for(zy=0;zy<zoom;zy++)
+		{
+			sptr = &vdt_ctx->bmp_buffer[(y*vdt_ctx->bmp_res_x)];
+			for(x=0;x<vdt_ctx->bmp_res_x;x++)
+			{
+				for(zx=0;zx<zoom;zx++)
+				{
+					*dptr++ = *sptr;
+				}
+				sptr++;
+			}
+		}
+	}
+
+	bmp->data = bmp_buffer;
+	bmp->xsize = bmp_res_x;
+	bmp->ysize = bmp_res_y;
+}
+
+int write_bmp(char * vdt_file, char * bmp_file, int pal, int out_mode, int zoom)
 {
 	char ofilename[512];
 	int offset;
@@ -858,22 +898,25 @@ int write_bmp(char * vdt_file, char * bmp_file, int pal, int out_mode)
 			close_file(&fc);
 
 			vdt_render(vdt_ctx);
+			zoom_vdt(vdt_ctx, &bmp, zoom);
 
-			bmp.xsize = vdt_ctx->bmp_res_x;
-			bmp.ysize = vdt_ctx->bmp_res_y;
-			bmp.data = vdt_ctx->bmp_buffer;
-
-			if(!out_mode)
-				bmp24b_write(ofilename,&bmp);
-			else
+			if(bmp.data)
 			{
-				for(i=0;i<(bmp.xsize * bmp.ysize);i++)
+				if(!out_mode)
+					bmp24b_write(ofilename,&bmp);
+				else
 				{
-					tmp_buf[(i*4)+1] = bmp.data[i] & 0xFF;
-					tmp_buf[(i*4)+2] = (bmp.data[i]>>8) & 0xFF;
-					tmp_buf[(i*4)+3] = (bmp.data[i]>>16) & 0xFF;
+					for(i=0;i<(bmp.xsize * bmp.ysize);i++)
+					{
+						tmp_buf[(i*4)+1] = bmp.data[i] & 0xFF;
+						tmp_buf[(i*4)+2] = (bmp.data[i]>>8) & 0xFF;
+						tmp_buf[(i*4)+3] = (bmp.data[i]>>16) & 0xFF;
+					}
+					fwrite(tmp_buf, bmp.xsize * bmp.ysize * 4, 1, stdout);
 				}
-				fwrite(tmp_buf, bmp.xsize * bmp.ysize * 4, 1, stdout);
+
+				free(bmp.data);
+				bmp.data = NULL;
 			}
 		}
 		else
@@ -1323,7 +1366,7 @@ int main(int argc, char* argv[])
 #endif
 
 	fprintf(stderr,"Minitel VDT to BMP converter v%s\n",STR_FILE_VERSION2);
-	fprintf(stderr,"Copyright (C) 2022-2024 Jean-Francois DEL NERO\n");
+	fprintf(stderr,"Copyright (C) 2022-2026 Jean-Francois DEL NERO\n");
 	fprintf(stderr,"This program comes with ABSOLUTELY NO WARRANTY\n");
 	fprintf(stderr,"This is free software, and you are welcome to redistribute it\n");
 	fprintf(stderr,"under certain conditions;\n\n");
@@ -1533,7 +1576,7 @@ int main(int argc, char* argv[])
 		{
 			if(argv[i][0] != '-')
 			{
-				write_bmp(argv[i], ofilename, pal,outmode);
+				write_bmp(argv[i], ofilename, pal,outmode,appctx.zoom);
 			}
 
 			i++;
