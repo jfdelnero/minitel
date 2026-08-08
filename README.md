@@ -7,7 +7,7 @@ Ce dépot contient différents projets en lien avec le Minitel.
 [**doc/**](doc/)
 
 Minitel hardware and firmware hack study.
-( Please visit http://hxc2001.free.fr/minitel/index.html too !)
+( Please visit https://hxc2001.pages-perso.free.fr/minitel/index.html too !)
 
 [**minitel2/**](minitel2/)
 
@@ -25,7 +25,7 @@ Vidéotex files (*.vdt) to BMP and WAV files. Contains an Vidéotex emulator and
 
 Note : Il ne s'agit ici que d'un simple extrait de la page d'origine, bien plus complète aujourd'hui :
 
-[**http://hxc2001.free.fr/minitel/index.html**](http://hxc2001.free.fr/minitel/index.html)
+[**https://hxc2001.pages-perso.free.fr/minitel/index.html**](https://hxc2001.pages-perso.free.fr/minitel/index.html)
 
 Le but de cette projet est de présenter les résultats de l'étude technique du Minitel que j'ai réalisé il y a quelques années.
 Mais pourquoi faire le reverse engineering du Minitel, objet complètement démodé, aux capacités apparemment très limitées ?
@@ -132,7 +132,7 @@ Et voici la matrice du clavier :
 Une fois que les composants sont identifiés et que l'architecture générale du minitel est bien comprise, il est maintenant possible de le programmer.
 Le microprocesseur étant basé sur un coeur de 80C51, j'ai simplement utilisé SDCC :
 
-http://sdcc.sourceforge.net/
+https://sdcc.sourceforge.net/
 
 A l'aide de ce compilateur j'ai pu réaliser différents tests de différentes routines d'affichage (2D et 3D) afin de déterminer les capacités de la machine. En voici quelques exemples en images :
 
@@ -150,7 +150,7 @@ Bientôt plus de détails !
 
 J'ai ajouté le support de l'émulation hardware du Minitel 2 dans Mame :
 
-http://hxc2001.free.fr/minitel/mame_minitel.zip
+https://hxc2001.pages-perso.free.fr/minitel/mame_minitel.zip
 
 L'archive contient Mame ainsi que la ROM d'origine et celle de la démo avec différents effets graphiques 2D et 3D.
 Les sources du driver Minitel 2 sont sur le dépot officiel de Mame :
@@ -165,6 +165,6 @@ A noter que les sources de la démo sont disponibles sur ce dépot.
 
 L'ensemble se compile avec SDCC.
 
-( Page du projet : http://hxc2001.free.fr/minitel/index.html )
+( Page du projet : https://hxc2001.pages-perso.free.fr/minitel/index.html )
 
 Jean-François DEL NERO

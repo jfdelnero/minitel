@@ -1,5 +1,5 @@
 # VDT2BMP
-(C) 2022-2025 Jean-François DEL NERO
+(C) 2022-2026 Jean-François DEL NERO
 
 * Videotex file (*.vdt) to bmp file converter.
 * Videotex file (*.vdt) to wav file converter. (V.23 modulation)
@@ -63,5 +63,5 @@ Linux, target Windows (with mingw32), with SDL support (Full capability)
 	Bridge to another server      : vdt2bmp -ws:ws://3615co.de/ws -zoom:2
 
 
-[![Watch the video](http://hxc2001.free.fr/minitel/pages_minitel/minitel_etam.png)](http://hxc2001.free.fr/minitel/pages_minitel/minitel_etam.mp4)
+[![Watch the video](https://hxc2001.pages-perso.free.fr/minitel/pages_minitel/minitel_etam.png)](https://hxc2001.pages-perso.free.fr/minitel/pages_minitel/minitel_etam.mp4)
 
