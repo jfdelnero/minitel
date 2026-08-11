@@ -82,20 +82,20 @@ void setpixel(uint8_t x,uint8_t y, uint8_t state)
 
 		if(c>3) c=32+(c-4);
 
-		WAIT_TS9347;
+		WAIT_VIDEO_BUSY;
 
-		TS9347_R6= (0x20)|(c>>2);
-		TS9347_R7= buffernb | (k<<2)|(c&0x3);
-		TS9347_ER0=CMD_TBM| 0x08;
+		VIDEO_R6= (0x20)|(c>>2);
+		VIDEO_R7= buffernb | (k<<2)|(c&0x3);
+		VIDEO_ER0=CMD_TBM| 0x08;
 
-		WAIT_TS9347;
+		WAIT_VIDEO_BUSY;
 
 		if(state)
-			TS9347_R1=  d | TS9347_R1;
+			VIDEO_R1=  d | VIDEO_R1;
 		else
-			TS9347_R1= (~d) & TS9347_R1;
+			VIDEO_R1= (~d) & VIDEO_R1;
 
-		TS9347_ER0=CMD_TBM;
+		VIDEO_ER0=CMD_TBM;
 	}
 }
 
@@ -111,16 +111,16 @@ void setpixelFast(uint8_t x,uint8_t y)
 
 	if(c&0xFC) c=c+28;
 
-	WAIT_TS9347;
+	WAIT_VIDEO_BUSY;
 
-	TS9347_R6= (0x20)|(c>>2);
-	TS9347_R7= buffernb | (k<<2)|(c&0x3);
-	TS9347_ER0=CMD_TBM| 0x08;
+	VIDEO_R6= (0x20)|(c>>2);
+	VIDEO_R7= buffernb | (k<<2)|(c&0x3);
+	VIDEO_ER0=CMD_TBM| 0x08;
 
-	WAIT_TS9347;
-	TS9347_R1=  (0x01<<(x&0x7)) | TS9347_R1;
+	WAIT_VIDEO_BUSY;
+	VIDEO_R1=  (0x01<<(x&0x7)) | VIDEO_R1;
 
-	TS9347_ER0=CMD_TBM;
+	VIDEO_ER0=CMD_TBM;
 }
 
 
